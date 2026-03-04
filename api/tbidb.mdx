@@ -1,0 +1,165 @@
+---
+title: TBIDB
+description: Generic database import and export class
+---
+
+## Overview
+
+`TBIDB` provides database connectivity for importing data from SQL databases into TeeBI structures. Works with any ADO, FireDAC, or dbExpress connection through a pluggable engine architecture.
+
+Location: `BI.DB.pas:51`
+
+## Setup
+
+Before using TBIDB, you must configure the database engine:
+
+```pascal
+uses
+  BI.DB, BI.DB.FireDAC;  // or BI.DB.ADO, etc.
+  
+begin
+  TBIDB.Engine := TBIFireDACEngine.Create;  // Set your engine
+end;
+```
+
+## Constructor
+
+```pascal
+Constructor CreateEngine(const AEngine: TBIDBEngine);
+```
+
+## Properties
+
+### Engine
+```pascal
+class property Engine: TBIDBEngine;
+```
+The database engine used for all import operations.
+
+## Methods
+
+### Import from Connection
+```pascal
+function Import(const Connection: TCustomConnection): TDataArray;
+```
+Imports all tables from a database connection.
+
+### Import from Definition
+```pascal
+class function Import(const Connection: TCustomConnection; const MultiThread: Boolean): TDataArray;
+```
+Class method with optional parallel table loading.
+
+### Import from File
+```pascal
+function DoImportFile(const FileName: String): TDataArray;
+```
+Imports from database files (e.g., SQLite, Access).
+
+## Usage Example
+
+### Basic Import
+
+```pascal
+var
+  Connection: TFDConnection;
+  DB: TBIDB;
+  Data: TDataArray;
+begin
+  // Setup engine
+  TBIDB.Engine := TBIFireDACEngine.Create;
+  
+  Connection := TFDConnection.Create(nil);
+  try
+    Connection.DriverName := 'SQLite';
+    Connection.Params.Database := 'mydb.db';
+    Connection.Open;
+    
+    DB := TBIDB.Create;
+    try
+      Data := DB.Import(Connection);
+      // Data now contains all tables
+    finally
+      DB.Free;
+    end;
+  finally
+    Connection.Free;
+  end;
+end;
+```
+
+### Using Data Definition
+
+```pascal
+var
+  Def: TDataDefinition;
+  Data: TDataArray;
+begin
+  Def := TDataDefinition.Create(nil);
+  try
+    Def.Kind := TDataDefinitionKind.Database;
+    Def['Driver'] := 'SQLite';
+    Def['Database'] := 'mydb.db';
+    
+    // Optional filters
+    Def['Include'] := 'Users,Orders*';  // Only these tables
+    Def['Exclude'] := '*_backup';       // Skip backup tables
+    
+    Data := Def.Import('');
+  finally
+    Def.Free;
+  end;
+end;
+```
+
+---
+
+## TBIDBExport
+
+Location: `BI.DB.pas:76`
+
+Export data to database tables or create TDataSet from TDataItem.
+
+### Methods
+
+```pascal
+class procedure Add(const ADataSet: TDataSet; const AData: TDataItem);
+```
+Adds TDataItem rows to an existing TDataSet.
+
+```pascal
+class function From(const AOwner: TComponent; const AData: TDataItem): TDataSet;
+```
+Creates a new TDataSet from TDataItem.
+
+### Usage Example
+
+```pascal
+var
+  DataSet: TDataSet;
+  Data: TDataItem;
+begin
+  // Create dataset from data
+  DataSet := TBIDBExport.From(nil, MyData);
+  try
+    DataSet.Open;
+    // Use dataset...
+  finally
+    DataSet.Free;
+  end;
+end;
+```
+
+## Supported Engines
+
+- **FireDAC**: TBIFireDACEngine (BI.DB.FireDAC)
+- **ADO**: TBIADOEngine (BI.DB.ADO)
+- **dbExpress**: TBIDBExpressEngine (BI.DB.DBX)
+
+## Features
+
+- **Parallel Import**: Multi-threaded table loading for large databases
+- **Schema Detection**: Automatic detection of primary keys and foreign keys
+- **Type Mapping**: Automatic conversion of SQL types to TDataKind
+- **Progress Events**: Monitor import progress
+- **Error Handling**: Skip problematic tables with error callbacks

@@ -1,0 +1,550 @@
+---
+title: Export Customization
+description: Advanced export customization and formatting options
+---
+
+Customize data export with formatting, filtering, and transformation options.
+
+## Export Filtering
+
+Filter data before export:
+
+```pascal
+uses
+  BI.Expression, BI.DataSource;
+
+var
+  Exporter: TBIExcelExport;
+  Cursor: TDataCursor;
+  Filter: TExpression;
+begin
+  // Create filter
+  Filter := Data['Year'] = 2024;
+  
+  // Apply to cursor
+  Cursor := TDataCursor.Create(nil);
+  try
+    Cursor.Data := Data;
+    Cursor.Filter := Filter;
+    
+    // Export filtered data
+    Exporter := TBIExcelExport.Create(nil);
+    try
+      Exporter.Data := Cursor.Data;
+      Exporter.SaveToFile('filtered.xlsx');
+    finally
+      Exporter.Free;
+    end;
+  finally
+    Cursor.Free;
+  end;
+end;
+```
+
+## Field Selection
+
+Export specific columns:
+
+```pascal
+var
+  ExportData: TDataItem;
+  SelectedFields: TDataArray;
+begin
+  // Select fields to export
+  SetLength(SelectedFields, 3);
+  SelectedFields[0] := Data['Name'];
+  SelectedFields[1] := Data['Email'];
+  SelectedFields[2] := Data['Amount'];
+  
+  // Create subset
+  ExportData := TDataItem.Create;
+  try
+    ExportData.AsTable := True;
+    for var Field in SelectedFields do
+      ExportData.Items.Add(Field);
+    
+    // Export
+    TBICSVExport.SaveToFile(ExportData, 'selected.csv');
+  finally
+    ExportData.Free;
+  end;
+end;
+```
+
+## Column Ordering
+
+Reorder columns for export:
+
+```pascal
+var
+  OrderedData: TDataItem;
+begin
+  OrderedData := TDataItem.Create;
+  try
+    OrderedData.AsTable := True;
+    
+    // Add in desired order
+    OrderedData.Items.Add(Data['ID']);
+    OrderedData.Items.Add(Data['Name']);
+    OrderedData.Items.Add(Data['Date']);
+    OrderedData.Items.Add(Data['Amount']);
+    
+    TBICSVExport.SaveToFile(OrderedData, 'ordered.csv');
+  finally
+    OrderedData.Free;
+  end;
+end;
+```
+
+## Value Formatting
+
+Custom value formatting:
+
+```pascal
+uses
+  BI.DataItem;
+
+var
+  Exporter: TBIExcelExport;
+begin
+  Exporter := TBIExcelExport.Create(nil);
+  try
+    Exporter.Data := Data;
+    
+    // Date formatting
+    Exporter.DateFormat := 'yyyy-mm-dd';
+    
+    // Currency formatting
+    Exporter.CurrencyFormat := '$#,##0.00';
+    
+    // Number formatting
+    Exporter.NumberFormat := '#,##0.00';
+    
+    // Percentage formatting
+    Exporter.PercentFormat := '0.00%';
+    
+    // Boolean formatting
+    Exporter.BooleanTrue := 'Yes';
+    Exporter.BooleanFalse := 'No';
+    
+    Exporter.SaveToFile('formatted.xlsx');
+  finally
+    Exporter.Free;
+  end;
+end;
+```
+
+## Aggregated Export
+
+Export pivot table results:
+
+```pascal
+uses
+  BI.Summary;
+
+var
+  Summary: TSummary;
+  Result: TDataItem;
+  Exporter: TBIExcelExport;
+begin
+  // Create pivot table
+  Summary := TSummary.Create(nil);
+  try
+    Summary.AddGroupBy(Data['Region']);
+    Summary.AddGroupBy(Data['Quarter']);
+    Summary.AddMeasure(Data['Sales'], TAggregate.Sum);
+    
+    Result := Summary.Calculate;
+    
+    // Export aggregated results
+    Exporter := TBIExcelExport.Create(nil);
+    try
+      Exporter.Data := Result;
+      Exporter.SheetName := 'Sales Summary';
+      Exporter.SaveToFile('summary.xlsx');
+    finally
+      Exporter.Free;
+    end;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+## Header Customization
+
+Customize column headers:
+
+```pascal
+var
+  Exporter: TBICSVExport;
+begin
+  Exporter := TBICSVExport.Create(nil);
+  try
+    Exporter.Data := Data;
+    
+    // Custom headers
+    Exporter.HeaderNames['CustomerID'] := 'Customer #';
+    Exporter.HeaderNames['OrderDate'] := 'Date';
+    Exporter.HeaderNames['TotalAmount'] := 'Total';
+    
+    // Or disable headers
+    Exporter.IncludeHeader := False;
+    
+    Exporter.SaveToFile('custom_headers.csv');
+  finally
+    Exporter.Free;
+  end;
+end;
+```
+
+## Styling (Excel)
+
+Apply Excel styles:
+
+```pascal
+var
+  Excel: TBIExcelExport;
+begin
+  Excel := TBIExcelExport.Create(nil);
+  try
+    Excel.Data := Data;
+    
+    // Header styling
+    Excel.HeaderBackColor := RGB(0, 112, 192);  // Blue
+    Excel.HeaderFontColor := clWhite;
+    Excel.HeaderFontSize := 11;
+    Excel.HeaderBold := True;
+    
+    // Data styling
+    Excel.FontName := 'Calibri';
+    Excel.FontSize := 10;
+    Excel.AlternateRowColor := RGB(242, 242, 242);
+    
+    // Column widths
+    Excel.ColumnWidth['Name'] := 200;      // Pixels
+    Excel.ColumnWidth['Description'] := 400;
+    Excel.AutoFitColumns := True;  // Auto-fit others
+    
+    // Number formatting by column
+    Excel.ColumnFormat['Amount'] := '$#,##0.00';
+    Excel.ColumnFormat['Percent'] := '0.00%';
+    Excel.ColumnFormat['Date'] := 'mm/dd/yyyy';
+    
+    Excel.SaveToFile('styled.xlsx');
+  finally
+    Excel.Free;
+  end;
+end;
+```
+
+## Conditional Formatting
+
+Highlight values based on conditions:
+
+```pascal
+var
+  Excel: TBIExcelExport;
+begin
+  Excel := TBIExcelExport.Create(nil);
+  try
+    Excel.Data := Data;
+    
+    // Highlight amounts > 1000 in red
+    Excel.AddConditionalFormat('Amount', 
+      cfGreaterThan, 
+      1000, 
+      RGB(255, 199, 206),  // Background
+      RGB(156, 0, 6)       // Font
+    );
+    
+    // Color scale for percentages
+    Excel.AddColorScale('Completion', 
+      clRed,    // Low
+      clYellow, // Mid
+      clGreen   // High
+    );
+    
+    // Data bars
+    Excel.AddDataBars('Sales', clBlue);
+    
+    Excel.SaveToFile('conditional.xlsx');
+  finally
+    Excel.Free;
+  end;
+end;
+```
+
+## Charts (Excel)
+
+Embed charts in Excel:
+
+```pascal
+var
+  Excel: TBIExcelExport;
+begin
+  Excel := TBIExcelExport.Create(nil);
+  try
+    Excel.Data := Data;
+    
+    // Add column chart
+    Excel.AddChart(
+      'Sales by Region',           // Title
+      xlColumnClustered,           // Type
+      'A1:B10',                    // Data range
+      'F2'                         // Position
+    );
+    
+    // Chart options
+    Excel.ChartWidth := 400;
+    Excel.ChartHeight := 300;
+    Excel.ChartLegendPosition := xlLegendPositionBottom;
+    
+    Excel.SaveToFile('with_chart.xlsx');
+  finally
+    Excel.Free;
+  end;
+end;
+```
+
+## Templates (Excel)
+
+Use Excel templates:
+
+```pascal
+var
+  Excel: TBIExcelExport;
+begin
+  Excel := TBIExcelExport.Create(nil);
+  try
+    // Load template
+    Excel.Template := 'report_template.xlsx';
+    
+    // Fill data starting at B5
+    Excel.StartCell := 'B5';
+    Excel.Data := Data;
+    
+    // Save as new file
+    Excel.SaveToFile('filled_report.xlsx');
+  finally
+    Excel.Free;
+  end;
+end;
+```
+
+## PDF Customization
+
+Advanced PDF options:
+
+```pascal
+var
+  PDF: TBIPDFExport;
+begin
+  PDF := TBIPDFExport.Create(nil);
+  try
+    PDF.Data := Data;
+    
+    // Document properties
+    PDF.Title := 'Sales Report';
+    PDF.Author := 'Company Name';
+    PDF.Subject := 'Q4 2024';
+    PDF.Keywords := 'sales, report';
+    
+    // Page setup
+    PDF.PageOrientation := poLandscape;
+    PDF.PageSize := psA4;
+    PDF.MarginLeft := 20;
+    PDF.MarginTop := 20;
+    PDF.MarginRight := 20;
+    PDF.MarginBottom := 20;
+    
+    // Header/Footer
+    PDF.ShowHeader := True;
+    PDF.HeaderText := 'Sales Report';
+    PDF.ShowFooter := True;
+    PDF.FooterText := 'Page [PageNum] of [TotalPages]';
+    
+    // Grid styling
+    PDF.GridLineColor := RGB(192, 192, 192);
+    PDF.GridLineWidth := 1;
+    PDF.AlternateRowColor := RGB(240, 240, 240);
+    
+    // Fonts
+    PDF.HeaderFontName := 'Arial';
+    PDF.HeaderFontSize := 12;
+    PDF.HeaderFontStyle := [fsBold];
+    PDF.DataFontName := 'Arial';
+    PDF.DataFontSize := 10;
+    
+    PDF.SaveToFile('report.pdf');
+  finally
+    PDF.Free;
+  end;
+end;
+```
+
+## Custom Exporters
+
+Create custom export formats:
+
+```pascal
+type
+  TMyCustomExporter = class
+  private
+    FData: TDataItem;
+  public
+    procedure ExportToCustomFormat(const FileName: String);
+    property Data: TDataItem read FData write FData;
+  end;
+
+procedure TMyCustomExporter.ExportToCustomFormat(const FileName: String);
+var
+  Output: TStringList;
+  Row: Integer;
+  Col: TDataItem;
+begin
+  Output := TStringList.Create;
+  try
+    // Custom header
+    Output.Add('# Custom Format Export');
+    Output.Add('# Date: ' + DateTimeToStr(Now));
+    Output.Add('');
+    
+    // Data
+    for Row := 0 to FData.Count - 1 do
+    begin
+      var Line := '';
+      for Col in FData.Items.AsArray do
+      begin
+        if Line <> '' then
+          Line := Line + ' | ';
+        Line := Line + Col.DataToString(Row);
+      end;
+      Output.Add(Line);
+    end;
+    
+    Output.SaveToFile(FileName);
+  finally
+    Output.Free;
+  end;
+end;
+```
+
+## Export Progress
+
+Monitor export progress:
+
+```pascal
+var
+  Excel: TBIExcelExport;
+begin
+  Excel := TBIExcelExport.Create(nil);
+  try
+    Excel.Data := Data;
+    
+    // Progress callback
+    Excel.OnProgress := procedure(Sender: TObject; 
+                                  Percent: Single; 
+                                  var Cancel: Boolean)
+    begin
+      ProgressBar.Position := Round(Percent);
+      StatusLabel.Caption := Format('Exporting: %.0f%%', [Percent]);
+      Application.ProcessMessages;
+      
+      if UserClickedCancel then
+        Cancel := True;
+    end;
+    
+    Excel.SaveToFile('large.xlsx');
+  finally
+    Excel.Free;
+  end;
+end;
+```
+
+## Complete Example
+
+```pascal
+uses
+  BI.DataItem, BI.Summary, BI.Expression, BI.Excel;
+
+procedure ExportCustomReport;
+var
+  Data: TDataItem;
+  Summary: TSummary;
+  Result: TDataItem;
+  Filter: TExpression;
+  Excel: TBIExcelExport;
+begin
+  // Load data
+  Data := LoadSalesData;
+  
+  // Filter current year
+  Filter := Data['Year'] = 2024;
+  
+  // Create summary
+  Summary := TSummary.Create(nil);
+  try
+    Summary.Filter := Filter;
+    Summary.AddGroupBy(Data['Region']);
+    Summary.AddGroupBy(Data['Quarter']);
+    Summary.AddMeasure(Data['Amount'], TAggregate.Sum);
+    
+    Result := Summary.Calculate;
+    
+    // Export with full customization
+    Excel := TBIExcelExport.Create(nil);
+    try
+      Excel.Data := Result;
+      
+      // Sheet settings
+      Excel.SheetName := 'Sales Summary 2024';
+      Excel.FreezeHeader := True;
+      Excel.AutoFitColumns := True;
+      
+      // Styling
+      Excel.HeaderBackColor := RGB(0, 112, 192);
+      Excel.HeaderFontColor := clWhite;
+      Excel.HeaderBold := True;
+      Excel.AlternateRowColor := RGB(242, 242, 242);
+      
+      // Formatting
+      Excel.ColumnFormat['Sum(Amount)'] := '$#,##0.00';
+      
+      // Conditional formatting
+      Excel.AddConditionalFormat('Sum(Amount)', 
+        cfGreaterThan, 
+        100000, 
+        RGB(198, 239, 206), 
+        RGB(0, 97, 0)
+      );
+      
+      // Add chart
+      Excel.AddChart(
+        'Sales by Region and Quarter',
+        xlColumnClustered,
+        'A1:D10',
+        'F2'
+      );
+      
+      // Save
+      Excel.SaveToFile('sales_report_2024.xlsx');
+    finally
+      Excel.Free;
+    end;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Overview" icon="file-export" href="/export/overview">
+    Export system overview
+  </Card>
+  <Card title="Formats" icon="file" href="/export/formats">
+    Supported export formats
+  </Card>
+</CardGroup>

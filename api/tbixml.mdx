@@ -1,0 +1,164 @@
+---
+title: TBIXML
+description: XML data import and export class
+---
+
+## Overview
+
+`TBIXML` imports and exports XML data to and from TeeBI structures. Uses a pluggable XML engine architecture supporting multiple XML parsers (MSXML, OXml, Omni, FPC).
+
+Location: `BI.XMLData.pas:63`
+
+## Constructor
+
+```pascal
+Constructor CreateEngine(const AEngine: TXmlEngine);
+```
+
+Creates importer with custom XML engine, or use default constructor for platform engine.
+
+## Properties
+
+### EngineClass
+```pascal
+class var EngineClass: TXmlEngineClass;
+```
+Pluggable XML parsing engine. Platform default used if nil.
+
+### ExcludeNodes
+```pascal
+property ExcludeNodes: TTextArray;
+```
+XML nodes to skip during import.
+
+## Methods
+
+### Import from File
+```pascal
+function ImportFile(const FileName: String): TDataArray;
+```
+
+### Import from Text
+```pascal
+function ImportText(const Text: String): TDataItem;
+```
+Imports XML from string.
+
+### Import from Strings
+```pascal
+function Import(const Strings: TStrings): TDataArray;
+```
+
+### Parse
+```pascal
+function Parse(const Text: String): Boolean;
+```
+Validates XML without importing.
+
+### CreateParser (Class Method)
+```pascal
+class function CreateParser: TXmlEngine;
+```
+Creates XML engine instance.
+
+## Supported File Types
+
+```pascal
+class function Supports(const Extension: String): Boolean;
+```
+Supports: `.xml`
+
+## Usage Example
+
+```pascal
+var
+  XML: TBIXML;
+  Data: TDataItem;
+begin
+  XML := TBIXML.Create;
+  try
+    // Import from file
+    Data := TBISource.FromData(XML.ImportFile('data.xml'));
+    
+    // Or from text
+    Data := XML.ImportText(
+      '<?xml version="1.0"?>' +
+      '<root>' +
+      '  <item><name>Alice</name><age>30</age></item>' +
+      '  <item><name>Bob</name><age>25</age></item>' +
+      '</root>'
+    );
+    
+    ShowMessage('Rows: ' + IntToStr(Data.Count));
+  finally
+    XML.Free;
+  end;
+end;
+```
+
+---
+
+## TBIXMLExport
+
+Location: `BI.XMLData.pas:93`
+
+Export TeeBI data to XML format.
+
+### Properties
+
+```pascal
+Emit: TBIXMLEmit;
+```
+- `Header`: Include XML declaration
+- `Simple`: Minimal XML output
+
+### Usage Example
+
+```pascal
+var
+  Export: TBIXMLExport;
+begin
+  Export := TBIXMLExport.Create;
+  try
+    Export.Emit := TBIXMLEmit.Header;
+    Export.Data := MyData;
+    Export.SaveToFile('output.xml');
+  finally
+    Export.Free;
+  end;
+end;
+```
+
+## XML Mapping
+
+TeeBI converts XML to data structures:
+
+- **Elements** → TDataItem fields
+- **Attributes** → Data fields (merged with element data)
+- **Nested elements** → Hierarchical tables
+- **Repeated elements** → Rows in a table
+- **Text content** → Field values
+
+### Example Mapping
+
+```xml
+<employees>
+  <employee id="1">
+    <name>John</name>
+    <salary>50000</salary>
+  </employee>
+  <employee id="2">
+    <name>Jane</name>
+    <salary>60000</salary>
+  </employee>
+</employees>
+```
+
+Becomes a table with columns: `id`, `name`, `salary` and 2 rows.
+
+## Available XML Engines
+
+- **MSXML**: Windows default (BI.XMLData.MSXML)
+- **OXml**: Cross-platform (BI.XMLData.OXml)
+- **Omni**: Alternative parser (BI.XMLData.Omni)
+- **FPC**: Free Pascal (BI.XMLData.FPC)

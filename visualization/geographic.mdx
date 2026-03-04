@@ -1,0 +1,379 @@
+---
+title: Geographic Visualization
+description: Display data on world maps with geographic database support
+---
+
+TeeBI includes a comprehensive geographic database for displaying data on world maps.
+
+## Overview
+
+The geographic database (`BI.Geographic.pas`) provides:
+
+- World country data with ISO codes
+- Administrative divisions (states, provinces, regions)
+- Automatic map visualization
+- Geographic data linking
+
+See `BI.Geographic.pas:317-338` for the `TGeo` class.
+
+## Geographic Database
+
+Access the global geographic database:
+
+```pascal
+uses
+  BI.Geographic;
+
+begin
+  // Initialize database (automatic on first use)
+  TGeo.Check;
+  
+  // Access country data
+  ShowMessage(TGeo.Country.Name.TextData[0]);
+end;
+```
+
+See `BI.Geographic.pas:657-672` for the `Check` method.
+
+## Countries
+
+Access country information using `TCountry` (`BI.Geographic.pas:74-86`):
+
+```pascal
+var
+  Countries: TDataItem;
+  Name, Capital: TDataItem;
+begin
+  Countries := TGeo.Country.Countries;
+  Name := TGeo.Country.Name;
+  Capital := TGeo.Country.Capital;
+  
+  // ISO codes
+  ISONum := TGeo.Country.ISONum;    // ISO-3166 Numeric
+  ISOA2 := TGeo.Country.ISOA2;      // ISO-3166 Alpha-2
+  ISOA3 := TGeo.Country.ISOA3;      // ISO-3166 Alpha-3
+end;
+```
+
+See `BI.Geographic.pas:546-556` for country data loading.
+
+## Continents
+
+Access continent data:
+
+```pascal
+var
+  Continents: TEntity;
+begin
+  Continents := TGeo.Continents;
+  
+  // Access continent names
+  ShowMessage(Continents.Name.TextData[0]);
+end;
+```
+
+See `BI.Geographic.pas:667` for continent initialization.
+
+## Administrative Divisions
+
+Access subdivisions by country using `TEntities` (`BI.Geographic.pas:88-315`):
+
+### United States
+
+```pascal
+var
+  USA: TUSA;
+  States, Counties: TEntity;
+begin
+  USA := TGeo.Entities.USA;
+  
+  // Access states
+  States := USA.States;
+  ShowMessage(States.Name.TextData[0]);  // First state name
+  
+  // Access counties
+  Counties := USA.Counties;
+end;
+```
+
+See `BI.Geographic.pas:280-288` and `BI.Geographic.pas:808-813` for USA entities.
+
+### Spain
+
+```pascal
+var
+  Spain: TSpain;
+  Regions, Provinces: TEntity;
+begin
+  Spain := TGeo.Entities.Spain;
+  
+  Regions := Spain.Regions;
+  Provinces := Spain.Provinces;
+end;
+```
+
+See `BI.Geographic.pas:251-259` and `BI.Geographic.pas:890-895` for Spain entities.
+
+### Other Countries
+
+Supported countries include:
+
+- **Australia** - Lands, Counties
+- **Brazil** - Regions, States
+- **Canada** - Provinces
+- **China** - Provinces, Prefectures
+- **France** - Regions, Départements
+- **Germany** - States, Districts
+- **India** - Zones, States
+- **Indonesia** - Zones, Provinces
+- **Italy** - MacroRegions, Regions, Provinces
+- **Japan** - Regions, Prefectures
+- **Mexico** - States
+- **Netherlands** - Provinces, Municipalities
+- **Portugal** - Regions, Districts
+- **Russia** - Districts, Subjects
+- **South Africa** - Provinces
+- **South Korea** - Types, Provinces
+- **Switzerland** - Cantons
+- **UK** - NUTS, Counties
+
+See `BI.Geographic.pas:92-314` for all country entities.
+
+## Automatic Map Detection
+
+TeeBI automatically detects geographic data:
+
+```pascal
+uses
+  VCLBI.Chart, BI.Geographic;
+
+var
+  Chart: TBIChart;
+  Data: TDataItem;
+begin
+  Chart := TBIChart.Create(Owner);
+  Chart.Parent := Self;
+  
+  // Data with country names automatically displays map
+  Chart.Data := CountrySalesData;
+  
+  // TeeBI detects geographic content and creates map
+  // Chart.Options.Mode will be TBIChartMode.Geographic
+end;
+```
+
+See `VCLBI.Chart.pas:1041-1042` for geographic detection.
+
+## Linking Data
+
+Link your data to geographic entities:
+
+```pascal
+var
+  LinkedData: TDataItem;
+begin
+  // Check if data is linked to geographic database
+  LinkedData := TGeo.LinkedTo(MyData);
+  
+  if LinkedData <> nil then
+    ShowMessage('Data is geographic: ' + LinkedData.Name);
+end;
+```
+
+See `BI.Geographic.pas:639-655` for the `LinkedTo` method.
+
+## Entity Structure
+
+Each entity has standard fields:
+
+```pascal
+type
+  TEntity = record
+    Data: TDataItem;      // Full data table
+    ID: TDataItem;        // Unique identifier
+    Name: TDataItem;      // Display name
+    Pad: Integer;         // Zero-padding for IDs
+  end;
+```
+
+See `BI.Geographic.pas:23-44` for the `TEntity` record.
+
+### Using Entities
+
+```pascal
+var
+  States: TEntity;
+  StateID, StateName: String;
+begin
+  States := TGeo.Entities.USA.States;
+  
+  // Get state ID
+  StateID := States.ID.TextData[0];
+  
+  // Get state name
+  StateName := States.Name.TextData[0];
+  
+  // Lookup by code
+  StateName := States.NameOfCode(12);  // Florida
+end;
+```
+
+See `BI.Geographic.pas:367-370` for the `NameOfCode` method.
+
+## Master-Detail Relationships
+
+Navigate hierarchical geographic data:
+
+```pascal
+var
+  Link: TMasterDetail;
+  Multi: TMasterDetail;
+begin
+  // Check if data has master-detail relationship
+  if TGeo.IsMultiEntity(MyData, Multi) then
+  begin
+    // Access master
+    ShowMessage('Master: ' + Multi.Master.Data.Name);
+    
+    // Access detail
+    ShowMessage('Detail: ' + Multi.Detail.Data.Name);
+    
+    // Access linking field
+    ShowMessage('Link: ' + Multi.DetailToMaster.Name);
+  end;
+end;
+```
+
+See `BI.Geographic.pas:617-626` for the `IsMultiEntity` method.
+
+### Available Relationships
+
+Pre-configured master-detail links:
+
+- Continents → Countries
+- Spain: Regions → Provinces
+- France: Regions → Départements
+- Japan: Regions → Prefectures
+- USA: States → Counties
+- And more...
+
+See `BI.Geographic.pas:516-536` for all relationships.
+
+## Geographic Charts
+
+Create maps programmatically:
+
+```pascal
+uses
+  VCLBI.Chart, VCLBI.Chart.Geo, BI.Geographic;
+
+var
+  Chart: TBIChart;
+  Values, Text: TDataItem;
+begin
+  Chart := TBIChart.Create(Owner);
+  Chart.Parent := Self;
+  Chart.Align := alClient;
+  
+  // Force geographic mode
+  Chart.Options.Mode := TBIChartMode.Geographic;
+  
+  // Set data
+  Values := SalesData['Amount'];    // Values to display
+  Text := SalesData['Country'];     // Country names
+  
+  Chart.Data := SalesData;
+end;
+```
+
+See `VCLBI.Chart.pas:1193-1194` for geographic chart creation.
+
+## Synonyms
+
+Handle alternative country names:
+
+```pascal
+var
+  RealName: String;
+begin
+  // Find official name from synonym
+  RealName := TGeo.FindSynonym('USA');
+  // Returns: 'United States of America'
+  
+  RealName := TGeo.FindSynonym('UK');
+  // Returns: 'United Kingdom'
+end;
+```
+
+See `BI.Geographic.pas:701-721` for the `FindSynonym` method.
+
+Built-in synonyms include:
+- USA → United States of America
+- UK → United Kingdom
+- Korea → South Korea
+- And 40+ more
+
+See `BI.Geographic.pas:725-774` for all synonyms.
+
+## Complete Example
+
+```pascal
+uses
+  VCLBI.Chart, BI.DataItem, BI.Geographic, BI.Summary;
+
+procedure CreateCountrySalesMap;
+var
+  Chart: TBIChart;
+  Data: TDataItem;
+  Summary: TSummary;
+begin
+  // Load sales data with country column
+  Data := LoadSalesData;
+  
+  // Create pivot by country
+  Summary := TSummary.Create(nil);
+  try
+    Summary.AddGroupBy(Data['Country']);
+    Summary.AddMeasure(Data['Amount'], TAggregate.Sum);
+    
+    // Create chart
+    Chart := TBIChart.Create(Owner);
+    Chart.Parent := Self;
+    Chart.Align := alClient;
+    
+    // Display on world map
+    Chart.Fill(Summary);
+    
+    // Customize
+    Chart.Chart.Title.Text := 'Sales by Country';
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+## Database Location
+
+The geographic database is stored separately:
+
+```pascal
+var
+  GeoData: TDataItem;
+begin
+  // Load from default store
+  GeoData := TStore.Load('Geo');
+end;
+```
+
+See `BI.Geographic.pas:662` for database loading.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Charts" icon="chart-line" href="/visualization/charts">
+    Display geographic data in charts
+  </Card>
+  <Card title="Export" icon="download" href="/export/overview">
+    Export geographic visualizations
+  </Card>
+</CardGroup>

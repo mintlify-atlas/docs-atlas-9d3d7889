@@ -1,0 +1,141 @@
+---
+title: Data Import Overview
+description: Import data from multiple sources into TeeBI
+---
+
+TeeBI provides a comprehensive suite of data import capabilities, allowing you to load data from various file formats, databases, and even AI services. All import operations are designed to be simple, fast, and automatic.
+
+## Import Sources
+
+TeeBI supports importing data from:
+
+<CardGroup cols={2}>
+  <Card title="CSV/TSV" icon="file-csv" href="/import/csv">
+    Import comma or tab-separated text files with automatic delimiter detection
+  </Card>
+  <Card title="JSON" icon="brackets-curly" href="/import/json">
+    Load JSON data with support for nested structures and arrays
+  </Card>
+  <Card title="XML" icon="code" href="/import/xml">
+    Parse XML files with automatic hierarchy detection
+  </Card>
+  <Card title="Databases" icon="database" href="/import/databases">
+    Connect to SQL databases and import tables with full schema
+  </Card>
+  <Card title="Excel" icon="file-excel" href="/import/excel">
+    Import Microsoft Excel spreadsheets (.xls, .xlsx)
+  </Card>
+  <Card title="AI Agents" icon="brain" href="/import/ai">
+    Generate data from AI services like Google Gemini
+  </Card>
+  <Card title="ORM" icon="object-group" href="/import/orm">
+    Map custom objects and records to TDataItem structures
+  </Card>
+</CardGroup>
+
+## Basic Import Pattern
+
+All TeeBI import classes follow a consistent pattern:
+
+```pascal
+uses BI.DataItem, BI.CSV, BI.JSON, BI.DB;
+
+var
+  Data: TDataItem;
+
+// From file
+Data := TBICSV.FromFile('data.csv');
+
+// From text
+Data := TBIJson.ImportText('{"name":"value"}');
+
+// From database
+Data := TBIDB.From(SQLConnection1);
+```
+
+## Common Features
+
+### Automatic Detection
+
+Most importers automatically detect:
+- **Data types** - Integer, Float, Text, DateTime, Boolean
+- **Headers** - Column names from first row
+- **Delimiters** - CSV separators (comma, tab, semicolon)
+- **Structure** - Hierarchical relationships and master-detail
+
+### Progress Monitoring
+
+```pascal
+var
+  CSV: TBICSV;
+  
+CSV := TBICSV.Create;
+try
+  CSV.OnProgress := procedure(Sender: TObject; Percent: Integer; var Cancel: Boolean)
+    begin
+      ProgressBar1.Position := Percent;
+      if UserClickedCancel then
+        Cancel := True;
+    end;
+    
+  Data := CSV.ImportFile('large_file.csv');
+finally
+  CSV.Free;
+end;
+```
+
+### Error Handling
+
+All importers support custom error handlers:
+
+```pascal
+CSV.OnError := function(Sender: TObject; const ErrorMsg: String): Boolean
+  begin
+    ShowMessage('Import error: ' + ErrorMsg);
+    Result := True; // Continue import
+  end;
+```
+
+## Import from URLs
+
+Use `TBIURLSource` to automatically detect and import from web URLs:
+
+```pascal
+Data := TBIURLSource.From('https://example.com/data.json');
+```
+
+## Multi-threaded Import
+
+For large datasets, enable multi-threaded import:
+
+```pascal
+var
+  DB: TBIDB;
+  
+DB := TBIDB.Create(nil, True); // MultiThread = True
+try
+  DataArray := DB.Import(SQLConnection1);
+finally
+  DB.Free;
+end;
+```
+
+## File Filters
+
+Get supported file extensions for open dialogs:
+
+```pascal
+OpenDialog1.Filter := TBICSV.FileFilter.ToString;
+OpenDialog1.Filter := TBIJson.FileFilter.ToString;
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="CSV Import" icon="file-csv" href="/import/csv">
+    Learn about CSV import with delimiter detection and header parsing
+  </Card>
+  <Card title="Database Import" icon="database" href="/import/databases">
+    Connect to SQL databases and import entire schemas
+  </Card>
+</CardGroup>

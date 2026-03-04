@@ -1,0 +1,318 @@
+---
+title: TBIGrid
+description: Grid component for displaying TeeBI data
+---
+
+## Overview
+
+`TBIGrid` is a visual component that displays TDataItem structures in a grid/table format. It uses a pluggable architecture supporting different grid engines (DBGrid, TeeGrid, etc.).
+
+Location: `VCLBI.Grid.pas:69`
+
+## Setup
+
+Set the grid engine before using TBIGrid:
+
+```pascal
+uses
+  VCLBI.Grid, VCLBI.Grid.DBGrid;  // or VCLBI.Grid.TeeGrid
+  
+initialization
+  TBIGrid.Engine := TBIDBGridPlugin;  // Default VCL grid
+end.
+```
+
+## Properties
+
+### Data
+```pascal
+property Data: TDataItem;
+```
+The data to display in the grid.
+
+### DataSource
+```pascal
+property DataSource: TDataSource;
+```
+Underlying TDataSource for database compatibility.
+
+### ReadOnly
+```pascal
+property ReadOnly: Boolean default True;
+```
+Prevent editing of data.
+
+### CurrentRow
+```pascal
+property CurrentRow: Integer;
+```
+Get or set the currently selected row index.
+
+### Alternate
+```pascal
+property Alternate: TAlternateColor;
+```
+Alternating row colors configuration.
+
+### RowNumbers
+```pascal
+property RowNumbers: TRowNumbers;
+```
+Show/hide row number column.
+
+```pascal
+BIGrid1.RowNumbers.Enabled := True;
+```
+
+### Filters
+```pascal
+property Filters: TGridFilters;
+```
+Enable column filtering.
+
+```pascal
+BIGrid1.Filters.Enabled := True;
+```
+
+### Search
+```pascal
+property Search: TGridSearch;
+```
+Enable search functionality.
+
+```pascal
+BIGrid1.Search.Enabled := True;
+```
+
+### ShowItems
+```pascal
+property ShowItems: TGridShowItems default Automatic;
+```
+Control display of nested items:
+- `Automatic`: Show if data contains sub-items
+- `Yes`: Always show
+- `No`: Never show
+
+### Totals
+```pascal
+property Totals: Boolean default False;
+```
+Display column totals/summary row.
+
+## Methods
+
+### BindTo
+```pascal
+procedure BindTo(const AData: TDataItem);
+```
+Alias for setting Data property.
+
+### FocusCell
+```pascal
+procedure FocusCell(const ARow: Integer; const AData: TDataItem);
+```
+Set focus to specific cell.
+
+### Colorize
+```pascal
+procedure Colorize(const AItems: TDataColorizers);
+```
+Apply conditional formatting colors.
+
+### Duplicates
+```pascal
+procedure Duplicates(const AData: TDataItem; const Hide: Boolean);
+```
+Highlight or hide duplicate values.
+
+## Events
+
+### OnDataChange
+```pascal
+property OnDataChange: TNotifyEvent;
+```
+Fired when current row changes.
+
+```pascal
+procedure TForm1.BIGrid1DataChange(Sender: TObject);
+begin
+  // Current row changed
+  Label1.Caption := 'Row: ' + IntToStr(BIGrid1.CurrentRow);
+end;
+```
+
+### OnUpdateData
+```pascal
+property OnUpdateData: TNotifyEvent;
+```
+Fired after data is edited.
+
+```pascal
+procedure TForm1.BIGrid1UpdateData(Sender: TObject);
+begin
+  // Data was modified
+  SaveChanges;
+end;
+```
+
+## Usage Examples
+
+### Basic Display
+
+```pascal
+var
+  Data: TDataItem;
+begin
+  Data := TBICSV.FromFile('data.csv');
+  BIGrid1.Data := Data;
+end;
+```
+
+### Editable Grid
+
+```pascal
+begin
+  BIGrid1.Data := MyData;
+  BIGrid1.ReadOnly := False;
+  BIGrid1.OnUpdateData := Grid1UpdateData;
+end;
+
+procedure TForm1.Grid1UpdateData(Sender: TObject);
+begin
+  // Save changes
+  TPersistence.Save(BIGrid1.Data, 'updated.bi');
+end;
+```
+
+### With Features Enabled
+
+```pascal
+begin
+  BIGrid1.Data := MyData;
+  
+  // Enable features
+  BIGrid1.RowNumbers.Enabled := True;
+  BIGrid1.Filters.Enabled := True;
+  BIGrid1.Search.Enabled := True;
+  BIGrid1.Totals := True;
+  
+  // Styling
+  BIGrid1.Alternate.Enabled := True;
+  BIGrid1.Alternate.Color := clMoneyGreen;
+end;
+```
+
+### Master-Detail
+
+```pascal
+var
+  Master, Detail: TDataItem;
+begin
+  // Master grid
+  Master := LoadOrders;
+  BIGrid1.Data := Master;
+  
+  // Detail shows items for selected order
+  BIGrid1.OnDataChange := 
+    procedure(Sender: TObject)
+    begin
+      Detail := Master.Items[BIGrid1.CurrentRow];
+      BIGrid2.Data := Detail;
+    end;
+end;
+```
+
+### Conditional Formatting
+
+```pascal
+var
+  Colorizers: TDataColorizers;
+  Col: TDataColorizer;
+begin
+  Colorizers := TDataColorizers.Create;
+  try
+    // Highlight high salaries in red
+    Col := Colorizers.Add(MySalaryColumn);
+    Col.Condition := TCondition.GreaterThan;
+    Col.Value := 50000;
+    Col.BackColor := clRed;
+    Col.FontColor := clWhite;
+    
+    BIGrid1.Colorize(Colorizers);
+  finally
+    Colorizers.Free;
+  end;
+end;
+```
+
+### Find and Select
+
+```pascal
+var
+  Row: Integer;
+begin
+  // Find row where Name = 'Alice'
+  Row := MyData.Items[0].Find('Alice');
+  
+  if Row <> -1 then
+  begin
+    BIGrid1.CurrentRow := Row;
+    BIGrid1.FocusCell(Row, MyData.Items[0]);
+  end;
+end;
+```
+
+## Grid Plugins
+
+### DBGrid Plugin (Default)
+
+```pascal
+uses VCLBI.Grid.DBGrid;
+
+TBIGrid.Engine := TBIDBGridPlugin;
+```
+
+Standard VCL TDBGrid wrapper.
+
+### TeeGrid Plugin
+
+```pascal
+uses VCLBI.Grid.TeeGrid;
+
+TBIGrid.Engine := TBITeeGridPlugin;
+```
+
+Advanced grid with more features.
+
+## Advanced Features
+
+### Filter Property
+
+```pascal
+var
+  Filter: TExpression;
+begin
+  // Show only rows where Age > 25
+  Filter := TExpression.Create('Age > 25');
+  BIGrid1.Filter := Filter;
+end;
+```
+
+### Plugin Access
+
+```pascal
+var
+  Plugin: TBIGridPlugin;
+begin
+  Plugin := BIGrid1.Plugin;
+  // Access plugin-specific features
+end;
+```
+
+## Design-Time
+
+At design-time:
+1. Drop TBIGrid on form
+2. Set Data in Object Inspector (if design-time data available)
+3. Configure properties (ReadOnly, RowNumbers, etc.)
+4. Double-click to create OnDataChange event

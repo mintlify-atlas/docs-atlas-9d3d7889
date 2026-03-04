@@ -1,0 +1,248 @@
+---
+title: Parallel Processing
+description: Leverage multi-core CPUs with TeeBI's parallel array processing
+---
+
+## Overview
+
+TeeBI includes parallel processing capabilities in the `BI.Arrays.Parallel` unit, enabling you to leverage multiple CPU cores for sorting and merging large arrays.
+
+## Parallel Array Sorting
+
+The `TParallelArray` class provides parallel sorting using a hybrid QuickSort + InsertionSort algorithm with split & merge.
+
+### Basic Usage
+
+```pascal
+uses BI.Arrays.Parallel;
+
+var 
+  Data: TInt32Array;
+  Sorted: TInt32Array;
+begin
+  // Create or load your array
+  SetLength(Data, 1000000);
+  // ... populate Data ...
+  
+  // Sort in parallel, ascending
+  Sorted := TParallelArray.Sort(Data, True);
+  
+  // Sort descending with specific thread count
+  Sorted := TParallelArray.Sort(Data, False, 4);
+  
+  // Auto-detect CPU count (Threads = 0)
+  Sorted := TParallelArray.Sort(Data, True, 0);
+end;
+```
+
+### Supported Array Types
+
+`TParallelArray.Sort` supports multiple data types:
+
+```pascal
+// Integer types
+function Sort(const Value: TInt32Array; 
+              const Ascending: Boolean = True;
+              const Threads: Integer = 0): TInt32Array;
+              
+function Sort(const Value: TInt64Array;
+              const Ascending: Boolean = True;
+              const Threads: Integer = 0): TInt64Array;
+
+// Floating-point types
+function Sort(const Value: TSingleArray;
+              const Ascending: Boolean = True;
+              const Threads: Integer = 0): TSingleArray;
+              
+function Sort(const Value: TDoubleArray;
+              const Ascending: Boolean = True;
+              const Threads: Integer = 0): TDoubleArray;
+```
+
+### Thread Count Parameter
+
+- **0**: Auto-detect CPU count using `TThread.ProcessorCount` (recommended)
+- **1**: Single-threaded sort (no parallelization)
+- **N > 1**: Use N threads explicitly
+- **N < 0**: Raises exception
+
+```pascal
+// Automatic CPU detection (recommended)
+Sorted := TParallelArray.Sort(Data, True, 0);
+
+// Use all CPU cores explicitly
+Sorted := TParallelArray.Sort(Data, True, TThread.ProcessorCount);
+
+// Use specific number of threads
+Sorted := TParallelArray.Sort(Data, True, 4);
+```
+
+## Algorithm Details
+
+### Split & Merge Strategy
+
+1. **Split**: Divide array into N segments (one per thread)
+2. **Parallel Sort**: Each thread sorts its segment independently
+3. **Merge**: Sequentially merge sorted segments back together
+
+### Hybrid Sorting
+
+Each segment uses a hybrid approach:
+- **QuickSort** for larger portions
+- **InsertionSort** for smaller portions (more efficient for small arrays)
+
+### Implementation
+
+From `BI.Arrays.Parallel.pas:147-161`:
+
+```pascal
+// Sort in parallel
+TParallel.&For(0, tmp-1, procedure(Index: Integer)
+var tmpHigh: TInteger;
+begin
+  if Index = tmp-1 then
+    tmpHigh := Value.Count-1
+  else
+  begin
+    tmpHigh := Pred((Index+1)*Steps);
+    if tmpHigh > Value.Count-1 then
+      tmpHigh := Value.Count-1;
+  end;
+  
+  Value.Sort(Index*Steps, tmpHigh, Ascending);
+end);
+```
+
+## Merging Sorted Arrays
+
+The `TSortedAscendingArray` and `TSortedDescendingArray` classes provide methods to merge already-sorted arrays.
+
+### Ascending Merge
+
+```pascal
+uses BI.Arrays.Parallel;
+
+var 
+  A, B: TInt32Array;
+  Merged: TInt32Array;
+begin
+  // Assuming A and B are already sorted ascending
+  Merged := TSortedAscendingArray.Merge(A, B);
+  
+  // Merge specific ranges
+  Merged := TSortedAscendingArray.Merge(A, B, 0, 99, 0, 199);
+  
+  // Merge multiple arrays
+  var Arrays: array of TInt32Array;
+  SetLength(Arrays, 3);
+  Arrays[0] := A;
+  Arrays[1] := B;
+  Arrays[2] := C;
+  Merged := TSortedAscendingArray.Merge(Arrays);
+end;
+```
+
+### Descending Merge
+
+```pascal
+// Same API, but for descending-sorted arrays
+Merged := TSortedDescendingArray.Merge(A, B);
+```
+
+### Supported Types for Merge
+
+- `TInt32Array`
+- `TInt64Array`
+- `TSingleArray`
+- `TDoubleArray`
+
+## Performance Considerations
+
+### When to Use Parallel Sort
+
+**Use parallel sort when:**
+- Array has > 100,000 elements
+- Multiple CPU cores available
+- Data is randomly distributed
+
+**Use single-threaded when:**
+- Array is small (< 10,000 elements)
+- Single-core CPU
+- Data is nearly sorted already
+
+### Benchmark Example
+
+```pascal
+uses System.Diagnostics, BI.Arrays.Parallel;
+
+var
+  Data: TInt64Array;
+  SW: TStopwatch;
+  SingleThreaded, MultiThreaded: TInt64Array;
+begin
+  // Create test data
+  SetLength(Data, 10000000);  // 10 million items
+  for var I := 0 to High(Data) do
+    Data[I] := Random(MaxInt);
+    
+  // Single-threaded
+  SW := TStopwatch.StartNew;
+  SingleThreaded := TParallelArray.Sort(Data, True, 1);
+  SW.Stop;
+  WriteLn('Single: ', SW.ElapsedMilliseconds, ' ms');
+  
+  // Multi-threaded
+  SW := TStopwatch.StartNew;
+  MultiThreaded := TParallelArray.Sort(Data, True, 0);
+  SW.Stop;
+  WriteLn('Parallel: ', SW.ElapsedMilliseconds, ' ms');
+end;
+```
+
+### Thread Overhead
+
+Smaller arrays may perform worse with parallelization due to thread creation overhead. Test with your specific data sizes.
+
+## Integration with TDataItem
+
+Parallel sorting works directly with TDataItem columns:
+
+```pascal
+uses BI.DataItem, BI.Arrays.Parallel;
+
+var
+  Data: TDataItem;
+  SortedIDs: TInt64Array;
+begin
+  // Assuming Data has an Int64 column 'CustomerID'
+  SortedIDs := TParallelArray.Sort(
+    Data['CustomerID'].Int64Data, 
+    True,  // Ascending
+    0      // Auto-detect CPUs
+  );
+  
+  // Note: This returns a sorted copy
+  // Original Data['CustomerID'] is unchanged
+end;
+```
+
+## Limitations
+
+1. **No Generics**: Due to Pascal limitations, each type has its own implementation
+2. **Copy-Based**: Returns new sorted array; original is not modified in-place
+3. **Simple Types Only**: Works only with numeric types (Int32, Int64, Single, Double)
+4. **Comparison Operator**: Requires `<` and `>` operators (why generics can't be used)
+
+## Best Practices
+
+1. **Auto-Detect Threads**: Use `Threads = 0` for automatic CPU detection
+2. **Profile First**: Measure performance before optimizing
+3. **Consider Data Size**: Parallel sort helps most with > 100K elements
+4. **Reuse Results**: Cache sorted arrays if used multiple times
+5. **Memory Aware**: Parallel sort creates temporary arrays; ensure adequate RAM
+
+## Related Topics
+
+- [Performance Optimization](/advanced/performance)
+- [Big Data Support](/advanced/big-data)
+- [Querying Data](/queries/overview)

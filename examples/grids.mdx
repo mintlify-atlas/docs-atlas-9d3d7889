@@ -1,0 +1,451 @@
+---
+title: Grids
+description: Display and interact with data using TeeBI grids
+---
+
+TeeBI grids provide powerful data display with automatic binding and interactive features.
+
+## Basic Grid Usage
+
+<Tabs>
+  <Tab title="VCL">
+```pascal
+uses
+  BI.DataItem, BI.Persist,
+  VCLBI.Grid;
+
+type
+  TForm1 = class(TForm)
+    BIGrid1: TBIGrid;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+  private
+    Data: TDataItem;
+  end;
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  // Load and display data
+  Data := TStore.Load('BISamples', 'Products');
+  BIGrid1.Data := Data;
+end;
+
+procedure TForm1.FormDestroy(Sender: TObject);
+begin
+  Data.Free;
+end;
+```
+  </Tab>
+  <Tab title="FMX">
+```pascal
+uses
+  BI.DataItem, BI.Persist,
+  FMXBI.Grid;
+
+type
+  TForm1 = class(TForm)
+    BIGrid1: TBIGrid;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+  private
+    Data: TDataItem;
+  end;
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  Data := TStore.Load('BISamples', 'Products');
+  BIGrid1.Data := Data;
+end;
+
+procedure TForm1.FormDestroy(Sender: TObject);
+begin
+  Data.Free;
+end;
+```
+  </Tab>
+</Tabs>
+
+## Grid Features
+
+```pascal
+// Alternating row colors
+BIGrid1.Alternate.Enabled := True;
+BIGrid1.Alternate.Color := clSilver;
+
+// Hide duplicate values in grouped data
+BIGrid1.Duplicates(Data['Category'], True);
+
+// Read-only
+BIGrid1.ReadOnly := True;
+
+// Multi-select
+BIGrid1.Options := BIGrid1.Options + [dgMultiSelect];
+```
+
+## Colorizing Cells
+
+```pascal
+uses VCLBI.Grid;
+
+procedure ColorizeCells;
+var
+  Colorizers: TDataColorizers;
+begin
+  SetLength(Colorizers, 1);
+
+  // Colorize by value
+  Colorizers[0].Data := Data['Stock'];
+  Colorizers[0].Colors.Inverted := False;  // High values = darker
+  Colorizers[0].TextColor := TColorizeTextColor.Automatic;
+  Colorizers[0].Mode := TColorizeMode.Full;  // Or .Left for bar
+
+  BIGrid1.Colorize(Colorizers);
+end;
+
+// Custom color scheme
+procedure CustomColors;
+var
+  Colorizers: TDataColorizers;
+begin
+  SetLength(Colorizers, 1);
+
+  Colorizers[0].Data := Data['Value'];
+  Colorizers[0].Colors.Clear;
+  Colorizers[0].Colors.Add(0, clRed);     // Min value
+  Colorizers[0].Colors.Add(0.5, clYellow); // Middle
+  Colorizers[0].Colors.Add(1, clGreen);   // Max value
+
+  BIGrid1.Colorize(Colorizers);
+end;
+```
+
+## Grid Editor
+
+```pascal
+uses VCLBI.Editor.BIGrid;
+
+// Show grid editor dialog
+procedure ShowGridEditor;
+begin
+  TBIGridEditor.Edit(Self, BIGrid1);
+end;
+
+// Embedd editor in a panel
+var
+  Editor: TBIGridEditor;
+begin
+  Editor := TBIGridEditor.Embedd(Self, Panel1, BIGrid1);
+end;
+```
+
+## Filtering Grid Data
+
+```pascal
+uses BI.Expression;
+
+// Apply filter expression
+procedure FilterGrid;
+var
+  Filter: TExpression;
+begin
+  Filter := TDataFilter.FromString(
+    Data,
+    '(UnitPrice > 50) and (Stock > 0)',
+    nil  // Error handler
+  );
+
+  if Filter <> nil then
+  try
+    BIGrid1.Filter := Filter;
+  finally
+    Filter.Free;
+  end;
+end;
+
+// Clear filter
+BIGrid1.Filter := nil;
+```
+
+## Refresh Grid Data
+
+```pascal
+// Refresh after data changes
+BIGrid1.RefreshData;
+
+// Rebind to new data
+procedure ChangeData;
+var
+  NewData: TDataItem;
+begin
+  NewData := TBISQL.From(OriginalData, 'top 100 *');
+  BIGrid1.Data.Free;
+  BIGrid1.Data := NewData;
+end;
+```
+
+## Using with TDataSet/TDataSource
+
+```pascal
+uses BI.DataSet, Data.DB;
+
+type
+  TForm1 = class(TForm)
+    BIDataSet1: TBIDataSet;
+    DataSource1: TDataSource;
+    DBGrid1: TDBGrid;  // Standard VCL DBGrid
+    procedure FormCreate(Sender: TObject);
+  end;
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  // BIDataSet bridges TeeBI to standard DB controls
+  BIDataSet1.Data := TStore.Load('BISamples', 'Products');
+  BIDataSet1.Open;
+
+  // Standard DBGrid works automatically
+  DataSource1.DataSet := BIDataSet1;
+  DBGrid1.DataSource := DataSource1;
+end;
+```
+
+## Custom Column Formatting
+
+```pascal
+uses VCLBI.Grid.DBGrid;
+
+// Access underlying DBGrid
+procedure FormatColumns;
+var
+  Grid: TBIDBGrid;
+begin
+  Grid := BIGrid1.Plugin.GetObject as TBIDBGrid;
+
+  // Format currency column
+  Grid.Fields[2].DisplayFormat := '$#,##0.00';
+
+  // Change column title
+  Grid.Fields[0].DisplayLabel := 'Product Name';
+
+  // Set column width
+  Grid.Columns[1].Width := 120;
+end;
+```
+
+## Export Grid Data
+
+```pascal
+uses BI.CSV, BI.Excel, BI.HTML;
+
+// Export to CSV
+procedure ExportToCSV;
+var
+  CSV: String;
+begin
+  CSV := TBICSVExport.AsString(BIGrid1.Data);
+  Memo1.Text := CSV;
+  // Or save to file
+  TBICSVExport.SaveToFile(BIGrid1.Data, 'export.csv');
+end;
+
+// Export to Excel
+procedure ExportToExcel;
+begin
+  TBIExcelExport.SaveToFile(BIGrid1.Data, 'export.xlsx');
+end;
+
+// Export to HTML
+procedure ExportToHTML;
+var
+  HTML: String;
+begin
+  HTML := TBIHTMLExport.AsString(BIGrid1.Data);
+  WebBrowser1.LoadFromString(HTML);
+end;
+```
+
+## Grid with Master-Detail
+
+See [Master-Detail](/examples/master-detail) for complete examples.
+
+## TeeGrid Integration
+
+```pascal
+{$DEFINE USE_TEEGRID}
+
+uses
+  {$IFDEF USE_TEEGRID}
+  VCLBI.Grid.TeeGrid,  // Use TeeGrid instead of DBGrid
+  Tee.Grid.Columns,
+  {$ENDIF}
+  VCLBI.Grid;
+
+procedure UseTeeGrid;
+var
+  Grid: TBITeeGrid;
+begin
+  {$IFDEF USE_TEEGRID}
+  Grid := BIGrid1.Plugin.GetObject as TBITeeGrid;
+  Grid.Columns[0].Width.Value := 150;
+  Grid.ReadOnly := True;
+  {$ENDIF}
+end;
+```
+
+## Complete Example: Interactive Grid
+
+```pascal
+uses
+  BI.DataItem, BI.SQL, BI.Persist,
+  VCLBI.Grid, VCLBI.Editor.BIGrid,
+  BI.Expression.Filter, VCLBI.Editor.DynamicFilter;
+
+type
+  TGridForm = class(TForm)
+    BIGrid1: TBIGrid;
+    Panel1: TPanel;
+    BtnEdit: TButton;
+    BtnFilter: TButton;
+    BtnExport: TButton;
+    CBAlternate: TCheckBox;
+    CBColorize: TCheckBox;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure BtnEditClick(Sender: TObject);
+    procedure BtnFilterClick(Sender: TObject);
+    procedure BtnExportClick(Sender: TObject);
+    procedure CBAlternateClick(Sender: TObject);
+    procedure CBColorizeClick(Sender: TObject);
+  private
+    Data: TDataItem;
+    Filter: TBIFilter;
+    procedure ApplyColorization;
+  end;
+
+procedure TGridForm.FormCreate(Sender: TObject);
+begin
+  // Load data
+  Data := TStore.Load('BISamples', 'Products');
+  BIGrid1.Data := Data;
+
+  // Create filter
+  Filter := TBIFilter.Create;
+
+  // Enable features
+  BIGrid1.Alternate.Enabled := True;
+  ApplyColorization;
+end;
+
+procedure TGridForm.FormDestroy(Sender: TObject);
+begin
+  Data.Free;
+  Filter.Free;
+end;
+
+procedure TGridForm.BtnEditClick(Sender: TObject);
+begin
+  TBIGridEditor.Edit(Self, BIGrid1);
+end;
+
+procedure TGridForm.BtnFilterClick(Sender: TObject);
+begin
+  TDynamicFilterEditor.Edit(Self, Filter, Data);
+  BIGrid1.Filter := Filter.Filter;
+end;
+
+procedure TGridForm.BtnExportClick(Sender: TObject);
+var
+  CSV: String;
+begin
+  CSV := TBICSVExport.AsString(BIGrid1.Data);
+  Clipboard.AsText := CSV;
+  ShowMessage('Exported to clipboard');
+end;
+
+procedure TGridForm.CBAlternateClick(Sender: TObject);
+begin
+  BIGrid1.Alternate.Enabled := CBAlternate.Checked;
+end;
+
+procedure TGridForm.CBColorizeClick(Sender: TObject);
+begin
+  ApplyColorization;
+end;
+
+procedure TGridForm.ApplyColorization;
+var
+  Colorizers: TDataColorizers;
+begin
+  if CBColorize.Checked then
+  begin
+    SetLength(Colorizers, 1);
+    Colorizers[0].Data := Data['UnitPrice'];
+    Colorizers[0].Colors.Inverted := False;
+    Colorizers[0].TextColor := TColorizeTextColor.Automatic;
+    Colorizers[0].Mode := TColorizeMode.Full;
+    BIGrid1.Colorize(Colorizers);
+  end
+  else
+    BIGrid1.Colorize(nil);
+end;
+```
+
+## Grid Events
+
+```pascal
+uses VCLBI.Grid.DBGrid;
+
+// Access DBGrid events
+procedure SetupEvents;
+var
+  DBGrid: TBIDBGrid;
+begin
+  DBGrid := BIGrid1.Plugin.GetObject as TBIDBGrid;
+  DBGrid.OnDblClick := GridDoubleClick;
+  DBGrid.OnDrawColumnCell := GridDrawColumnCell;
+end;
+
+procedure TForm1.GridDoubleClick(Sender: TObject);
+var
+  DBGrid: TBIDBGrid;
+begin
+  DBGrid := Sender as TBIDBGrid;
+  ShowMessage('Row: ' + IntToStr(DBGrid.TopRow));
+end;
+```
+
+## Performance Tips
+
+<CardGroup cols={2}>
+  <Card title="Large Datasets" icon="database">
+    For grids with 10,000+ rows:
+    - Disable alternating colors
+    - Disable colorization
+    - Use pagination with TOP/OFFSET
+  </Card>
+  <Card title="Refresh Strategy" icon="rotate">
+    ```pascal
+    BIGrid1.BeginUpdate;
+    try
+      // ... make changes ...
+    finally
+      BIGrid1.EndUpdate;
+    end;
+    ```
+  </Card>
+  <Card title="Memory Management" icon="memory">
+    Always free grid data when done:
+    ```pascal
+    BIGrid1.Data.Free;
+    ```
+  </Card>
+  <Card title="Virtual Mode" icon="bolt">
+    Use TeeGrid for virtual scrolling with millions of rows
+  </Card>
+</CardGroup>
+
+## See Also
+
+- [Charts](/examples/charts) - Visualize grid data
+- [Filters](/examples/filters) - Filter grid rows
+- [Master-Detail](/examples/master-detail) - Hierarchical grids
+- [Pivot Tables](/examples/pivot-tables) - Cross-tabulation grids

@@ -1,0 +1,432 @@
+---
+title: Tree Visualization
+description: Display hierarchical data using tree structures
+---
+
+TeeBI provides generic tree structures for representing hierarchical data.
+
+## Overview
+
+The `TNode<T>` generic class provides a flexible tree structure for any data type.
+
+See `BI.Tree.pas:104-141` for the `TNode<T>` class definition.
+
+## Basic Usage
+
+### Creating a Tree
+
+```pascal
+uses
+  BI.Tree;
+
+var
+  Root: TNode<String>;
+begin
+  Root := TNode<String>.Create;
+  try
+    Root.Data := 'Root';
+    
+    // Add children
+    Root.Add('Child 1');
+    Root.Add('Child 2');
+    Root.Add('Child 3');
+  finally
+    Root.Free;
+  end;
+end;
+```
+
+See `BI.Tree.pas:129-130` for the `Add` methods.
+
+### Generic Types
+
+Define custom tree types:
+
+```pascal
+type
+  TStringTree = TNode<String>;
+  TIntegerTree = TNode<Integer>;
+  TFloatTree = TNode<Single>;
+  TObjectTree = TNode<TMyObject>;
+```
+
+## Node Properties
+
+### Data
+
+Store custom data at each node:
+
+```pascal
+var
+  Node: TNode<TDateTime>;
+begin
+  Node := Root.Add(Now);
+  
+  // Access data
+  WriteLn(DateTimeToStr(Node.Data));
+  
+  // Modify data
+  Node.Data := Tomorrow;
+end;
+```
+
+See `BI.Tree.pas:125` for the `Data` property.
+
+### Count
+
+Get number of child nodes:
+
+```pascal
+var
+  ChildCount: Integer;
+begin
+  ChildCount := Node.Count;
+end;
+```
+
+See `BI.Tree.pas:132` for the `Count` method.
+
+### Empty
+
+Check if node has children:
+
+```pascal
+if Node.Empty then
+  ShowMessage('Node has no children');
+```
+
+See `BI.Tree.pas:134` for the `Empty` method.
+
+### Parent
+
+Access parent node:
+
+```pascal
+var
+  Parent: TNode<String>;
+begin
+  Parent := Node.Parent;
+  
+  if Parent = nil then
+    ShowMessage('This is a root node');
+end;
+```
+
+See `BI.Tree.pas:140` for the `Parent` property.
+
+### Index
+
+Get position in parent's children:
+
+```pascal
+var
+  Position: Integer;
+begin
+  Position := Node.Index;
+  
+  if Position = -1 then
+    ShowMessage('This is a root node');
+end;
+```
+
+See `BI.Tree.pas:137` for the `Index` property.
+
+### Level
+
+Get depth in tree (0 for root):
+
+```pascal
+var
+  Depth: Integer;
+begin
+  Depth := Node.Level;
+end;
+```
+
+See `BI.Tree.pas:139` for the `Level` property.
+
+## Accessing Children
+
+### Array Access
+
+```pascal
+var
+  Child: TNode<String>;
+begin
+  // Access by index
+  Child := Root[0];      // First child
+  Child := Root[1];      // Second child
+  Child := Root[Root.Count - 1];  // Last child
+end;
+```
+
+See `BI.Tree.pas:138` for the array property.
+
+## Tree Operations
+
+### Adding Nodes
+
+```pascal
+var
+  Node: TNode<String>;
+begin
+  // Add with data
+  Node := Root.Add('New Node');
+  
+  // Add without data (data is default value)
+  Node := Root.Add;
+end;
+```
+
+### Deleting Nodes
+
+```pascal
+// Delete by index (and all descendants)
+Root.Delete(0);  // Delete first child
+
+// Delete multiple
+Root.Delete(0, 3);  // Delete first 3 children
+
+// Free a node (removes from parent)
+Node.Free;
+```
+
+See `BI.Tree.pas:133` for the `Delete` method.
+
+### Clearing Tree
+
+```pascal
+// Remove all children
+Root.Clear;
+```
+
+See `BI.Tree.pas:131` for the `Clear` method.
+
+### Moving Nodes
+
+```pascal
+var
+  SourceNode, TargetNode: TNode<String>;
+begin
+  // Move node to new parent
+  SourceNode.Parent := TargetNode;
+  
+  // Detach from parent (becomes root)
+  SourceNode.Parent := nil;
+end;
+```
+
+See `BI.Tree.pas:140` for the `Parent` property setter.
+
+## Traversing Trees
+
+### ForEach Method
+
+Iterate through all nodes:
+
+```pascal
+var
+  Total: Integer;
+begin
+  Total := 0;
+  
+  // Recursive traversal
+  Root.ForEach(
+    procedure(const Item: TNode<Integer>)
+    begin
+      Total := Total + Item.Data;
+    end
+  );
+  
+  ShowMessage('Sum: ' + IntToStr(Total));
+end;
+```
+
+See `BI.Tree.pas:135` for the `ForEach` method.
+
+### Non-Recursive Traversal
+
+```pascal
+Root.ForEach(
+  procedure(const Item: TNode<String>)
+  begin
+    WriteLn(Item.Data);
+  end,
+  False  // Recursive = False (only direct children)
+);
+```
+
+## Complex Example
+
+### Organization Chart
+
+```pascal
+type
+  TEmployee = record
+    Name: String;
+    Title: String;
+    Salary: Currency;
+  end;
+  
+  TOrganization = TNode<TEmployee>;
+
+var
+  Company: TOrganization;
+  CEO, CTO, CFO: TOrganization;
+  Dev1, Dev2: TOrganization;
+  Employee: TEmployee;
+begin
+  Company := TOrganization.Create;
+  try
+    // CEO
+    Employee.Name := 'John Smith';
+    Employee.Title := 'CEO';
+    Employee.Salary := 200000;
+    CEO := Company.Add(Employee);
+    
+    // CTO
+    Employee.Name := 'Jane Doe';
+    Employee.Title := 'CTO';
+    Employee.Salary := 150000;
+    CTO := CEO.Add(Employee);
+    
+    // Developers
+    Employee.Name := 'Bob Wilson';
+    Employee.Title := 'Senior Developer';
+    Employee.Salary := 100000;
+    Dev1 := CTO.Add(Employee);
+    
+    Employee.Name := 'Alice Johnson';
+    Employee.Title := 'Developer';
+    Employee.Salary := 80000;
+    Dev2 := CTO.Add(Employee);
+    
+    // CFO
+    Employee.Name := 'Mark Brown';
+    Employee.Title := 'CFO';
+    Employee.Salary := 140000;
+    CFO := CEO.Add(Employee);
+    
+    // Print organization
+    Company.ForEach(
+      procedure(const Node: TOrganization)
+      var
+        Indent: String;
+      begin
+        Indent := StringOfChar(' ', Node.Level * 2);
+        WriteLn(Indent + Node.Data.Name + ' - ' + Node.Data.Title);
+      end
+    );
+    
+    // Calculate total payroll
+    var TotalPayroll: Currency := 0;
+    Company.ForEach(
+      procedure(const Node: TOrganization)
+      begin
+        TotalPayroll := TotalPayroll + Node.Data.Salary;
+      end
+    );
+    WriteLn('Total Payroll: $' + CurrToStr(TotalPayroll));
+    
+  finally
+    Company.Free;
+  end;
+end;
+```
+
+## File System Example
+
+```pascal
+type
+  TFileNode = record
+    Name: String;
+    IsDirectory: Boolean;
+    Size: Int64;
+  end;
+  
+  TFileTree = TNode<TFileNode>;
+
+procedure BuildFileTree(const Path: String; Parent: TFileTree);
+var
+  SR: TSearchRec;
+  Node: TFileTree;
+  FileInfo: TFileNode;
+begin
+  if FindFirst(Path + '*', faAnyFile, SR) = 0 then
+  begin
+    repeat
+      if (SR.Name <> '.') and (SR.Name <> '..') then
+      begin
+        FileInfo.Name := SR.Name;
+        FileInfo.IsDirectory := (SR.Attr and faDirectory) <> 0;
+        FileInfo.Size := SR.Size;
+        
+        Node := Parent.Add(FileInfo);
+        
+        if FileInfo.IsDirectory then
+          BuildFileTree(Path + SR.Name + '\', Node);
+      end;
+    until FindNext(SR) <> 0;
+    FindClose(SR);
+  end;
+end;
+
+var
+  Root: TFileTree;
+begin
+  Root := TFileTree.Create;
+  try
+    Root.Data.Name := 'C:\';
+    Root.Data.IsDirectory := True;
+    
+    BuildFileTree('C:\', Root);
+    
+    // Calculate total size
+    var TotalSize: Int64 := 0;
+    Root.ForEach(
+      procedure(const Node: TFileTree)
+      begin
+        if not Node.Data.IsDirectory then
+          TotalSize := TotalSize + Node.Data.Size;
+      end
+    );
+    WriteLn('Total Size: ' + IntToStr(TotalSize) + ' bytes');
+    
+  finally
+    Root.Free;
+  end;
+end;
+```
+
+## Memory Management
+
+<Warning>
+  Freeing a node automatically:
+  - Removes it from its parent
+  - Frees all descendant nodes recursively
+  - This cannot be undone
+</Warning>
+
+```pascal
+var
+  Branch: TNode<String>;
+begin
+  Branch := Root[2];
+  
+  // This frees Branch and all its children
+  Branch.Free;
+  
+  // Branch is now invalid, don't use it
+end;
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Charts" icon="chart-line" href="/visualization/charts">
+    Visualize tree data in charts
+  </Card>
+  <Card title="Grids" icon="table" href="/visualization/grids">
+    Display tree data in grids
+  </Card>
+</CardGroup>

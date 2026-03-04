@@ -1,0 +1,465 @@
+---
+title: Filters
+description: Advanced data filtering with dynamic filters, expressions, and interactive filter dialogs
+---
+
+TeeBI provides powerful filtering capabilities for interactive data exploration.
+
+## Dynamic Filters
+
+```pascal
+uses BI.Expression.Filter;
+
+type
+  TFilterForm = class(TForm)
+    BIGrid1: TBIGrid;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+  private
+    Data: TDataItem;
+    Filter: TBIFilter;
+    DateFilter: TFilterItem;
+    NumberFilter: TFilterItem;
+    TextFilter: TFilterItem;
+    BooleanFilter: TFilterItem;
+  end;
+
+procedure TFilterForm.FormCreate(Sender: TObject);
+begin
+  // Load data
+  Data := CreateSampleData;  // Your data source
+  BIGrid1.Data := Data;
+
+  // Create filter container
+  Filter := TBIFilter.Create;
+
+  // Add filter items for each column type
+  DateFilter := Filter.Add(Data['OrderDate']);
+  NumberFilter := Filter.Add(Data['Amount']);
+  TextFilter := Filter.Add(Data['CustomerName']);
+  BooleanFilter := Filter.Add(Data['IsActive']);
+end;
+
+procedure TFilterForm.FormDestroy(Sender: TObject);
+begin
+  Data.Free;
+  Filter.Free;
+end;
+```
+
+## Numeric Filters
+
+```pascal
+procedure SetupNumericFilter;
+var
+  NumFilter: TNumericFilter;
+begin
+  NumberFilter.Reset;
+  NumFilter := NumberFilter.Numeric;
+
+  // Exact value
+  NumFilter.Selected.Value := 1234;
+
+  // Greater than (not equal)
+  NumFilter.FromValue.Value := 100;
+  NumFilter.FromValue.Equal := False;
+
+  // Between (exclusive)
+  NumFilter.FromValue.Value := -500;
+  NumFilter.FromValue.Equal := False;
+  NumFilter.ToValue.Value := 500;
+  NumFilter.ToValue.Equal := False;
+
+  // Between (inclusive)
+  NumFilter.FromValue.Value := -300;
+  NumFilter.FromValue.Equal := True;
+  NumFilter.ToValue.Value := 300;
+  NumFilter.ToValue.Equal := True;
+
+  // Apply filter
+  NumberFilter.Enabled := True;
+  ApplyFilter;
+end;
+```
+
+## Text Filters
+
+```pascal
+procedure SetupTextFilter;
+var
+  TxtFilter: TTextFilter;
+begin
+  TextFilter.Reset;
+  TxtFilter := TextFilter.Text;
+
+  // Contains
+  TxtFilter.Style := TTextFilterStyle.Contains;
+  TxtFilter.Text := 'search';
+
+  // Equals
+  TxtFilter.Style := TTextFilterStyle.IsEqual;
+  TxtFilter.Text := 'Exact Match';
+
+  // Starts with
+  TxtFilter.Style := TTextFilterStyle.Starts;
+  TxtFilter.Text := 'Begin';
+
+  // Ends with
+  TxtFilter.Style := TTextFilterStyle.Ends;
+  TxtFilter.Text := 'End';
+
+  // Is empty
+  TxtFilter.Style := TTextFilterStyle.IsEmpty;
+
+  // Case sensitivity
+  TxtFilter.CaseSensitive := False;  // Default
+
+  TextFilter.Enabled := True;
+  ApplyFilter;
+end;
+```
+
+## Date/Time Filters
+
+```pascal
+procedure SetupDateFilter;
+var
+  DtFilter: TDateTimeFilter;
+begin
+  DateFilter.Reset;
+  DtFilter := DateFilter.DateTime;
+
+  // Relative dates
+  DtFilter.Style := TDateTimeFilterStyle.Today;
+  DtFilter.Style := TDateTimeFilterStyle.Yesterday;
+  DtFilter.Style := TDateTimeFilterStyle.Tomorrow;
+
+  // Last N days/months/years
+  DtFilter.Style := TDateTimeFilterStyle.Last;
+  DtFilter.Quantity := 7;
+  DtFilter.Period := TDateTimeSpan.Day;
+
+  // Next N days/months/years
+  DtFilter.Style := TDateTimeFilterStyle.Next;
+  DtFilter.Quantity := 30;
+  DtFilter.Period := TDateTimeSpan.Day;
+
+  // This period
+  DtFilter.Style := TDateTimeFilterStyle.This;
+  DtFilter.Period := TDateTimeSpan.Month;
+  // Also: TDateTimeSpan.Week, Year, Quarter
+
+  // Specific months
+  DtFilter.Months.January := True;
+  DtFilter.Months.December := True;
+
+  // Specific weekdays
+  DtFilter.Weekdays.Monday := True;
+  DtFilter.Weekdays.Friday := True;
+
+  // Custom date range
+  DtFilter.Style := TDateTimeFilterStyle.Custom;
+  DtFilter.FromDate := Now - 30;
+  DtFilter.ToDate := Now + 7;
+
+  // Date part (e.g., day of month)
+  DtFilter.Selected.Enabled := True;
+  DtFilter.Selected.Part := TDateTimePart.DayOfMonth;
+  DtFilter.Selected.Value := 15;  // 15th of any month
+
+  DateFilter.Enabled := True;
+  ApplyFilter;
+end;
+```
+
+## Boolean Filters
+
+```pascal
+procedure SetupBooleanFilter;
+var
+  BoolFilter: TBooleanFilter;
+begin
+  BooleanFilter.Reset;
+  BoolFilter := BooleanFilter.BoolFilter;
+
+  // Show both true and false
+  BoolFilter.IncludeTrue := True;
+  BoolFilter.IncludeFalse := True;
+
+  // Show only true
+  BoolFilter.IncludeTrue := True;
+  BoolFilter.IncludeFalse := False;
+
+  // Show only false
+  BoolFilter.IncludeTrue := False;
+  BoolFilter.IncludeFalse := True;
+
+  BooleanFilter.Enabled := True;
+  ApplyFilter;
+end;
+```
+
+## Applying Filters to Grid
+
+```pascal
+procedure ApplyFilter;
+var
+  FilterExpr: TExpression;
+begin
+  // Get combined filter expression
+  FilterExpr := Filter.Filter;
+
+  if FilterExpr = nil then
+    BIGrid1.Filter := nil
+  else
+  try
+    // Show filter as text
+    EditFilter.Text := FilterExpr.ToString;
+
+    // Apply to grid
+    BIGrid1.Filter := FilterExpr;
+
+    // Show filtered row count
+    LabelRows.Caption := 'Rows: ' + IntToStr(BIGrid1.DataSource.DataSet.RecordCount);
+  finally
+    FilterExpr.Free;
+  end;
+end;
+```
+
+## Inverted Filters
+
+```pascal
+// Invert filter (NOT operator)
+NumberFilter.Inverted := True;
+NumberFilter.Numeric.Selected.Value := 100;
+// Result: Show all rows EXCEPT where value = 100
+
+TextFilter.Inverted := True;
+TextFilter.Text.Style := TTextFilterStyle.Contains;
+TextFilter.Text.Text := 'test';
+// Result: Show rows that DON'T contain 'test'
+```
+
+## Filter Editor Dialog
+
+<Tabs>
+  <Tab title="VCL">
+```pascal
+uses VCLBI.Editor.Filter.Item;
+
+// Embedd filter editor in a panel
+var
+  Editor: TFilterItemEditor;
+begin
+  Editor := TFilterItemEditor.Embedd(Self, Panel1, NumberFilter);
+  Editor.OnChange := FilterChanged;
+end;
+
+// Modal dialog
+procedure EditFilter;
+begin
+  if TFilterItemEditor.Edit(Self, NumberFilter) then
+    ApplyFilter;
+end;
+```
+  </Tab>
+  <Tab title="FMX">
+```pascal
+uses FMXBI.Editor.Filter.Item;
+
+// Show filter editor
+var
+  Editor: TFilterItemEditor;
+begin
+  Editor := TFilterItemEditor.Create(Self);
+  Editor.Refresh(NumberFilter);
+  Editor.OnChange := FilterChanged;
+end;
+```
+  </Tab>
+</Tabs>
+
+## Dynamic Filter Dialog
+
+```pascal
+uses VCLBI.Editor.DynamicFilter;
+
+// Show comprehensive filter editor
+procedure ShowFilterDialog;
+begin
+  TDynamicFilterEditor.Edit(Self, Filter, BIGrid1.Data);
+  ApplyFilter;
+end;
+```
+
+## Expression-Based Filters
+
+```pascal
+uses BI.Expression;
+
+// Create filter from expression string
+var
+  FilterExpr: TExpression;
+begin
+  FilterExpr := TDataFilter.FromString(
+    Data,
+    '(Amount > 1000) and (Status = "Active")',
+    function(const APos: Integer; const AMessage: String): Boolean
+    begin
+      ShowMessage(Format('Error at position %d: %s', [APos, AMessage]));
+      Result := True;  // Handle error
+    end
+  );
+
+  if FilterExpr <> nil then
+  try
+    BIGrid1.Filter := FilterExpr;
+  finally
+    FilterExpr.Free;
+  end;
+end;
+```
+
+## Complete Example
+
+```pascal
+uses
+  BI.DataItem, BI.Expression.Filter,
+  VCLBI.Grid, VCLBI.Editor.Filter.Item;
+
+type
+  TFilterDemo = class(TForm)
+    BIGrid1: TBIGrid;
+    PanelEditor: TPanel;
+    PageControl1: TPageControl;
+    TabDate: TTabSheet;
+    TabNumber: TTabSheet;
+    TabText: TTabSheet;
+    TabBoolean: TTabSheet;
+    CheckBoxEnabled: TCheckBox;
+    CheckBoxInverted: TCheckBox;
+    LabelRows: TLabel;
+    EditFilter: TEdit;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure CheckBoxEnabledClick(Sender: TObject);
+    procedure CheckBoxInvertedClick(Sender: TObject);
+    procedure PageControl1Change(Sender: TObject);
+  private
+    Data: TDataItem;
+    Filter: TBIFilter;
+    DateFilter, NumberFilter, TextFilter, BooleanFilter: TFilterItem;
+    Editor: TFilterItemEditor;
+    
+    function CurrentFilter: TFilterItem;
+    procedure ApplyFilter;
+    procedure FilterChanged(Sender: TObject);
+  end;
+
+procedure TFilterDemo.FormCreate(Sender: TObject);
+begin
+  // Create sample data with 5000 rows
+  Data := GenerateSampleData(5000);
+  BIGrid1.Data := Data;
+
+  // Create filter system
+  Filter := TBIFilter.Create;
+  DateFilter := Filter.Add(Data['Date']);
+  NumberFilter := Filter.Add(Data['Amount']);
+  TextFilter := Filter.Add(Data['Category']);
+  BooleanFilter := Filter.Add(Data['Active']);
+
+  // Create embedded filter editor
+  Editor := TFilterItemEditor.Embedd(Self, PanelEditor, CurrentFilter);
+  Editor.OnChange := FilterChanged;
+end;
+
+procedure TFilterDemo.FormDestroy(Sender: TObject);
+begin
+  Data.Free;
+  Filter.Free;
+end;
+
+function TFilterDemo.CurrentFilter: TFilterItem;
+begin
+  case PageControl1.ActivePageIndex of
+    0: Result := DateFilter;
+    1: Result := NumberFilter;
+    2: Result := TextFilter;
+  else
+    Result := BooleanFilter;
+  end;
+end;
+
+procedure TFilterDemo.PageControl1Change(Sender: TObject);
+begin
+  Editor.Refresh(CurrentFilter);
+  CheckBoxEnabled.Checked := CurrentFilter.Enabled;
+  CheckBoxInverted.Checked := CurrentFilter.Inverted;
+end;
+
+procedure TFilterDemo.CheckBoxEnabledClick(Sender: TObject);
+begin
+  CurrentFilter.Enabled := CheckBoxEnabled.Checked;
+  ApplyFilter;
+end;
+
+procedure TFilterDemo.CheckBoxInvertedClick(Sender: TObject);
+begin
+  CurrentFilter.Inverted := CheckBoxInverted.Checked;
+  ApplyFilter;
+end;
+
+procedure TFilterDemo.FilterChanged(Sender: TObject);
+begin
+  ApplyFilter;
+end;
+
+procedure TFilterDemo.ApplyFilter;
+var
+  FilterExpr: TExpression;
+begin
+  FilterExpr := Filter.Filter;
+
+  if FilterExpr = nil then
+  begin
+    EditFilter.Text := '';
+    BIGrid1.Filter := nil;
+  end
+  else
+  try
+    EditFilter.Text := FilterExpr.ToString;
+    BIGrid1.Filter := FilterExpr;
+  finally
+    FilterExpr.Free;
+  end;
+
+  LabelRows.Caption := 'Rows: ' + 
+    IntToStr(BIGrid1.DataSource.DataSet.RecordCount);
+end;
+```
+
+## Performance Tips
+
+<CardGroup cols={2}>
+  <Card title="Index Filtered Columns" icon="bolt">
+    Create indexes on frequently filtered columns for better performance
+  </Card>
+  <Card title="Combine Filters" icon="link">
+    Use single filter with multiple conditions instead of multiple separate filters
+  </Card>
+  <Card title="Filter Early" icon="arrow-down">
+    Apply filters before expensive operations like GROUP BY
+  </Card>
+  <Card title="Reset When Done" icon="rotate-right">
+    Call `Filter.Reset` to clear all filters at once
+  </Card>
+</CardGroup>
+
+## See Also
+
+- [Simple Queries](/examples/simple-queries) - WHERE clause filtering
+- [SQL Queries](/examples/sql-queries) - Complex filter conditions
+- [Expressions](/examples/expressions) - Custom filter expressions
+- [Grids](/examples/grids) - Grid-based filtering

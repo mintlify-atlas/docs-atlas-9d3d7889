@@ -1,0 +1,350 @@
+---
+title: TDataKind
+description: Enumeration type defining the data types supported by TDataItem
+---
+
+## Overview
+
+`TDataKind` is an enumeration that specifies the data type of a TDataItem. Each TDataItem can store one specific type of data, and the Kind property determines which internal array (Int32Data, TextData, etc.) is used.
+
+## Enumeration Values
+
+<ResponseField name="dkInt32" type="TDataKind">
+  32-bit signed integer (-2,147,483,648 to 2,147,483,647)
+  
+  Used for standard integer values, counts, IDs, and other whole numbers.
+  
+  ```pascal
+  Data := TDataItem.Create(dkInt32, 'Quantity');
+  ```
+</ResponseField>
+
+<ResponseField name="dkInt64" type="TDataKind">
+  64-bit signed integer (very large range)
+  
+  Used for large integer values that exceed Int32 range, such as large IDs or financial calculations in cents.
+  
+  ```pascal
+  Data := TDataItem.Create(dkInt64, 'TransactionID');
+  ```
+</ResponseField>
+
+<ResponseField name="dkSingle" type="TDataKind">
+  Single-precision floating-point (4 bytes, ~7 decimal digits precision)
+  
+  Used for floating-point values where precision is less critical.
+  
+  ```pascal
+  Data := TDataItem.Create(dkSingle, 'Temperature');
+  ```
+</ResponseField>
+
+<ResponseField name="dkDouble" type="TDataKind">
+  Double-precision floating-point (8 bytes, ~15-16 decimal digits precision)
+  
+  The default float type for TeeBI, used for most decimal calculations.
+  
+  ```pascal
+  Data := TDataItem.Create(dkDouble, 'Price');
+  ```
+</ResponseField>
+
+<ResponseField name="dkExtended" type="TDataKind">
+  Extended-precision floating-point (10 bytes on x86, same as Double on x64)
+  
+  Used for highest precision calculations on 32-bit platforms.
+  
+  ```pascal
+  Data := TDataItem.Create(dkExtended, 'PreciseCalculation');
+  ```
+</ResponseField>
+
+<ResponseField name="dkText" type="TDataKind">
+  String/text data
+  
+  Used for text values, names, descriptions, and other string data.
+  
+  ```pascal
+  Data := TDataItem.Create(dkText, 'CustomerName');
+  ```
+</ResponseField>
+
+<ResponseField name="dkDateTime" type="TDataKind">
+  Date and time values
+  
+  Used for storing dates, times, or combined datetime values.
+  
+  ```pascal
+  Data := TDataItem.Create(dkDateTime, 'OrderDate');
+  ```
+</ResponseField>
+
+<ResponseField name="dkBoolean" type="TDataKind">
+  Boolean (True/False) values
+  
+  Used for flags, yes/no questions, and other binary states.
+  
+  ```pascal
+  Data := TDataItem.Create(dkBoolean, 'IsActive');
+  ```
+</ResponseField>
+
+<ResponseField name="dkUnknown" type="TDataKind">
+  Unknown or unspecified data type
+  
+  Default value when a TDataItem is created without specifying a kind. Should be set to a specific type before adding data.
+  
+  ```pascal
+  Data := TDataItem.Create; // Kind is dkUnknown
+  ```
+</ResponseField>
+
+## Helper Methods
+
+The TDataKindHelper record provides utility methods for working with TDataKind values:
+
+<ResponseField name="FromString" type="class function">
+  Converts a string to a TDataKind value.
+  
+  <ParamField path="AText" type="String" required>
+    The text representation of the data kind (e.g., "Int32", "Text")
+  </ParamField>
+  
+  <ParamField path="AKind" type="TDataKind" output>
+    Output parameter receiving the parsed TDataKind
+  </ParamField>
+  
+  Returns True if parsing was successful, False otherwise.
+  
+  ```pascal
+  var
+    Kind: TDataKind;
+  begin
+    if TDataKind.FromString('Int32', Kind) then
+      ShowMessage('Successfully parsed: ' + Kind.ToString);
+  end;
+  ```
+</ResponseField>
+
+<ResponseField name="IsNumeric" type="function">
+  Returns True if the data kind represents a numeric type.
+  
+  Numeric types include: dkInt32, dkInt64, dkSingle, dkDouble, dkExtended
+  
+  ```pascal
+  var
+    Kind: TDataKind;
+  begin
+    Kind := dkDouble;
+    if Kind.IsNumeric then
+      ShowMessage('This is a numeric type');
+      
+    Kind := dkText;
+    if not Kind.IsNumeric then
+      ShowMessage('This is not a numeric type');
+  end;
+  ```
+</ResponseField>
+
+<ResponseField name="ToString" type="function">
+  Converts the TDataKind value to a human-readable string.
+  
+  Returns a string representation of the data kind.
+  
+  ```pascal
+  var
+    Kind: TDataKind;
+  begin
+    Kind := dkInt32;
+    ShowMessage(Kind.ToString); // Shows "Int32"
+    
+    Kind := dkDateTime;
+    ShowMessage(Kind.ToString); // Shows "DateTime"
+  end;
+  ```
+</ResponseField>
+
+## Usage Examples
+
+### Determining Data Type
+
+```pascal
+var
+  Data: TDataItem;
+begin
+  Data := TDataItem.Create(dkDouble, 'Sales');
+  
+  // Check the data kind
+  case Data.Kind of
+    dkInt32, dkInt64:
+      ShowMessage('Integer data');
+    dkSingle, dkDouble, dkExtended:
+      ShowMessage('Floating-point data');
+    dkText:
+      ShowMessage('Text data');
+    dkDateTime:
+      ShowMessage('Date/Time data');
+    dkBoolean:
+      ShowMessage('Boolean data');
+    dkUnknown:
+      ShowMessage('Unknown data type');
+  end;
+  
+  Data.Free;
+end;
+```
+
+### Using IsNumeric
+
+```pascal
+procedure ProcessData(Data: TDataItem);
+begin
+  if Data.Kind.IsNumeric then
+  begin
+    // Calculate statistics for numeric data
+    ShowMessage('Mean: ' + FloatToStr(Data.Stats.Mean));
+    ShowMessage('Range: ' + FloatToStr(Data.Stats.Range));
+  end
+  else
+  begin
+    ShowMessage('Non-numeric data: ' + Data.Kind.ToString);
+  end;
+end;
+```
+
+### Dynamic Type Selection
+
+```pascal
+function CreateColumnFromType(TypeName: String; ColName: String): TDataItem;
+var
+  Kind: TDataKind;
+begin
+  if TDataKind.FromString(TypeName, Kind) then
+    Result := TDataItem.Create(Kind, ColName)
+  else
+  begin
+    ShowMessage('Unknown type: ' + TypeName + ', using Text');
+    Result := TDataItem.Create(dkText, ColName);
+  end;
+end;
+
+var
+  Column: TDataItem;
+begin
+  // Create columns based on string specifications
+  Column := CreateColumnFromType('Int32', 'Age');
+  Column.Free;
+  
+  Column := CreateColumnFromType('Text', 'Name');
+  Column.Free;
+end;
+```
+
+### Type-Safe Data Access
+
+```pascal
+procedure DisplayValue(Data: TDataItem; Index: Integer);
+var
+  Value: String;
+begin
+  // Access the appropriate array based on Kind
+  case Data.Kind of
+    dkInt32:
+      Value := IntToStr(Data.Int32Data[Index]);
+    dkInt64:
+      Value := IntToStr(Data.Int64Data[Index]);
+    dkSingle:
+      Value := FloatToStr(Data.SingleData[Index]);
+    dkDouble:
+      Value := FloatToStr(Data.DoubleData[Index]);
+    dkExtended:
+      Value := FloatToStr(Data.ExtendedData[Index]);
+    dkText:
+      Value := Data.TextData[Index];
+    dkDateTime:
+      Value := DateTimeToStr(Data.DateTimeData[Index]);
+    dkBoolean:
+      Value := BoolToStr(Data.BooleanData[Index], True);
+  else
+    Value := '(unknown)';
+  end;
+  
+  ShowMessage(Data.Name + '[' + IntToStr(Index) + '] = ' + Value);
+end;
+```
+
+### Converting Between Types
+
+```pascal
+// Note: TDataItem Kind is read-only and cannot be changed after creation
+// To convert, create a new TDataItem with the desired type
+
+function ConvertToText(Source: TDataItem): TDataItem;
+var
+  I: Integer;
+begin
+  Result := TDataItem.Create(dkText, Source.Name + '_Text');
+  Result.Resize(Source.Count);
+  
+  for I := 0 to Source.Count - 1 do
+  begin
+    if Source.Missing[I] then
+      Result.Missing[I] := True
+    else
+      Result.TextData[I] := Source.DataToString(I);
+  end;
+end;
+
+var
+  Numbers: TDataItem;
+  Text: TDataItem;
+begin
+  Numbers := TDataItem.Create(dkInt32, 'Numbers');
+  Numbers.Resize(3);
+  Numbers.Int32Data[0] := 10;
+  Numbers.Int32Data[1] := 20;
+  Numbers.Int32Data[2] := 30;
+  
+  // Convert to text
+  Text := ConvertToText(Numbers);
+  ShowMessage(Text.TextData[0]); // Shows "10"
+  
+  Numbers.Free;
+  Text.Free;
+end;
+```
+
+## Performance Considerations
+
+<AccordionGroup>
+  <Accordion title="Numeric Types">
+    - **Int32**: Fastest for integer operations, use when values fit in the range
+    - **Int64**: Slightly slower than Int32, use only when needed for large values
+    - **Double**: Best balance of precision and speed for floating-point
+    - **Single**: Faster but less precise, use for large datasets where precision is less critical
+    - **Extended**: Use only when maximum precision is required on 32-bit platforms
+  </Accordion>
+  
+  <Accordion title="Text Type">
+    - String comparisons and sorting are slower than numeric operations
+    - Consider using Text statistics sparingly on very large datasets
+    - Use IgnoreCase parameter carefully as it affects performance
+  </Accordion>
+  
+  <Accordion title="DateTime Type">
+    - Stored internally as TDateTime (double)
+    - Good performance for comparisons and sorting
+    - Statistical operations work efficiently
+  </Accordion>
+  
+  <Accordion title="Boolean Type">
+    - Most compact storage (1 byte per value)
+    - Very fast comparisons and sorting
+    - Ideal for flags and binary states
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+- [TDataItem](/api/tdataitem) - Main data container class
+- [TArrays](/api/tarrays) - Typed array helpers for each data kind

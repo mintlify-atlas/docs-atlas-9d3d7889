@@ -1,0 +1,378 @@
+---
+title: Group By & Aggregation
+description: Aggregate data with GROUP BY, calculate summaries, and create pivot-like results
+---
+
+TeeBI's GROUP BY functionality enables powerful data aggregation and summarization.
+
+## Basic GROUP BY
+
+```pascal
+uses BI.SQL;
+
+var Result: TDataItem;
+
+// Sum by single dimension
+Result := TBISQL.From(Products, 'sum(Stock) group by Category');
+
+// Multiple dimensions
+Result := TBISQL.From(Products, 'sum(Stock) group by Category, Color');
+
+// Count records
+Result := TBISQL.From(Orders, 'count(*) group by CustomerID');
+```
+
+## Aggregate Functions
+
+```pascal
+// All aggregate functions
+Result := TBISQL.From(Products,
+  'Category, ' +
+  'count(*) as Count, ' +
+  'sum(Stock) as TotalStock, ' +
+  'avg(UnitPrice) as AvgPrice, ' +
+  'min(UnitPrice) as MinPrice, ' +
+  'max(UnitPrice) as MaxPrice ' +
+  'group by Category');
+
+// Count distinct
+Result := TBISQL.From(Orders,
+  'CustomerID, count(distinct ProductID) as UniqueProducts ' +
+  'group by CustomerID');
+```
+
+## Using Summary Component
+
+<Tabs>
+  <Tab title="VCL">
+```pascal
+uses
+  BI.DataItem, BI.Summary, BI.Persist,
+  VCLBI.Grid, VCLBI.Chart;
+
+type
+  TForm1 = class(TForm)
+    BIGrid1: TBIGrid;
+    BIChart1: TBIChart;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+  private
+    Data, Result: TDataItem;
+    Summary: TSummary;
+  end;
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  // Load data
+  Data := TStore.Load('BISamples', 'Products');
+
+  // Create summary
+  Summary := TSummary.Create(Self);
+  Summary.Data := Data;
+
+  // Add dimensions (GROUP BY)
+  Summary.By.Add(Data['Category']);
+  Summary.By.Add(Data['Color']);
+
+  // Add measures (aggregates)
+  Summary.Measures.Add(Data['Stock']).Aggregate := agSum;
+  Summary.Measures.Add(Data['UnitPrice']).Aggregate := agAverage;
+
+  // Calculate
+  Result := TDataItem.Create(Summary);
+
+  // Display
+  BIGrid1.Data := Result;
+  BIChart1.Data := Result;
+end;
+
+procedure TForm1.FormDestroy(Sender: TObject);
+begin
+  Result.Free;
+  Data.Free;
+  Summary.Free;
+end;
+```
+  </Tab>
+  <Tab title="FMX">
+```pascal
+uses
+  BI.DataItem, BI.Summary, BI.Persist,
+  FMXBI.Grid, FMXBI.Chart;
+
+type
+  TForm1 = class(TForm)
+    BIGrid1: TBIGrid;
+    BIChart1: TBIChart;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+  private
+    Data, Result: TDataItem;
+    Summary: TSummary;
+  end;
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  // Load data
+  Data := TStore.Load('BISamples', 'Products');
+
+  // Create and configure summary
+  Summary := TSummary.Create(Self);
+  Summary.Data := Data;
+
+  Summary.By.Add(Data['Category']);
+  Summary.Measures.Add(Data['Stock']).Aggregate := agSum;
+
+  // Calculate and display
+  Result := TDataItem.Create(Summary);
+  BIGrid1.Data := Result;
+  BIChart1.Data := Result;
+end;
+
+procedure TForm1.FormDestroy(Sender: TObject);
+begin
+  Result.Free;
+  Data.Free;
+  Summary.Free;
+end;
+```
+  </Tab>
+</Tabs>
+
+## Multi-Level Grouping
+
+```pascal
+uses BI.Summary;
+
+// Create hierarchical grouping
+Summary := TSummary.Create(Self);
+try
+  Summary.Data := Orders;
+
+  // Group by Year, Quarter, Month
+  Summary.By.Add(Orders['OrderDate']).Part := dpYear;
+  Summary.By.Add(Orders['OrderDate']).Part := dpQuarter;
+  Summary.By.Add(Orders['OrderDate']).Part := dpMonth;
+
+  // Measure
+  Summary.Measures.Add(Orders['TotalAmount']).Aggregate := agSum;
+
+  Result := TDataItem.Create(Summary);
+  BIGrid1.Data := Result;
+finally
+  Summary.Free;
+end;
+```
+
+## Date/Time Parts
+
+```pascal
+// Group by date components
+Result := TBISQL.From(Orders,
+  'year(OrderDate) as Year, ' +
+  'month(OrderDate) as Month, ' +
+  'sum(TotalAmount) as Revenue ' +
+  'group by year(OrderDate), month(OrderDate)');
+
+// Quarter
+Result := TBISQL.From(Orders,
+  'year(OrderDate) as Year, ' +
+  'quarter(OrderDate) as Quarter, ' +
+  'sum(TotalAmount) ' +
+  'group by year(OrderDate), quarter(OrderDate)');
+
+// Day of week
+Result := TBISQL.From(Orders,
+  'dayofweek(OrderDate) as Weekday, ' +
+  'count(*) as OrderCount ' +
+  'group by dayofweek(OrderDate)');
+```
+
+## Filtering Aggregates (HAVING)
+
+```pascal
+// Filter on aggregated values
+Result := TBISQL.From(Products,
+  'Category, sum(Stock) ' +
+  'group by Category ' +
+  'having sum(Stock) > 100');
+
+// Multiple HAVING conditions
+Result := TBISQL.From(Customers,
+  'Country, count(*) as CustomerCount, sum(TotalOrders) as TotalRevenue ' +
+  'group by Country ' +
+  'having count(*) > 5 and sum(TotalOrders) > 10000');
+
+// HAVING with WHERE
+Result := TBISQL.From(Products,
+  'Category, sum(Stock) ' +
+  'where UnitPrice > 10 ' +  // Filter before grouping
+  'group by Category ' +
+  'having sum(Stock) > 50');   // Filter after grouping
+```
+
+## Hiding Duplicate Values
+
+```pascal
+uses VCLBI.Grid;
+
+// Hide repeated dimension values in grid
+procedure HideDuplicates;
+begin
+  if Summary <> nil then
+  begin
+    // Hide duplicates for all GROUP BY dimensions
+    for var Dimension in Summary.By do
+      if Dimension.DestData <> nil then
+        BIGrid1.Duplicates(Dimension.DestData, True);
+  end;
+end;
+```
+
+## Colorizing Aggregates
+
+```pascal
+uses VCLBI.Grid;
+
+procedure ColorizeResults;
+var
+  Colorizers: TDataColorizers;
+begin
+  SetLength(Colorizers, Summary.Measures.Count);
+
+  for var I := 0 to Summary.Measures.Count - 1 do
+  begin
+    Colorizers[I].Data := Summary.Measures[I].DestData;
+    Colorizers[I].Colors.Inverted := False;
+    Colorizers[I].TextColor := TColorizeTextColor.Automatic;
+    Colorizers[I].Mode := TColorizeMode.Full;
+  end;
+
+  BIGrid1.Colorize(Colorizers);
+end;
+```
+
+## Complete Example: Sales Summary
+
+```pascal
+uses
+  BI.DataItem, BI.Summary, BI.Persist,
+  VCLBI.Grid, VCLBI.Chart, System.Diagnostics;
+
+procedure CreateSalesSummary;
+var
+  Demo: TDataItem;
+  Summary: TSummary;
+  Result: TDataItem;
+  Stopwatch: TStopwatch;
+begin
+  // Load database
+  Demo := TStore.Load('SQLite_Demo');
+
+  // Create summary
+  Summary := TSummary.Create(nil);
+  try
+    Summary.Data := Demo['Orders'];
+
+    // Dimensions
+    Summary.By.Add(Demo['Customers']['Country']);
+    Summary.By.Add(Demo['Orders']['OrderDate']).Part := dpYear;
+
+    // Measures
+    Summary.Measures.Add(Demo['"Order Details"']['Quantity']).Aggregate := agSum;
+    Summary.Measures.Add(Demo['"Order Details"']['UnitPrice']).Aggregate := agAverage;
+    
+    with Summary.Measures.Add(Demo['Orders']['OrderID']) do
+    begin
+      Aggregate := agCount;
+      DestData.Name := 'Order Count';
+    end;
+
+    // Execute with timing
+    Stopwatch := TStopwatch.StartNew;
+    Result := TDataItem.Create(Summary);
+    
+    ShowMessage(Format('Calculated in %d ms', [Stopwatch.ElapsedMilliseconds]));
+
+    // Display
+    BIGrid1.Data := Result;
+    BIChart1.Data := Result;
+  finally
+    Summary.Free;
+    Demo.Free;
+  end;
+end;
+```
+
+## Summary Totals
+
+```pascal
+uses BI.Summary.Totals;
+
+// Create totals for a summary
+procedure ShowTotals;
+var
+  TotalsSummary: TSummary;
+  TotalsData: TDataItem;
+begin
+  TotalsSummary := TSummaryTotals.CreateSummary(Self, Summary);
+  try
+    TotalsData := TDataItem.Create(TotalsSummary);
+    BIGridTotals.Data := TotalsData;
+  finally
+    TotalsSummary.Free;
+  end;
+end;
+```
+
+## Custom Aggregate Expressions
+
+```pascal
+// Add calculated measure
+Summary.Measures.Add(
+  TExpression.FromString('Quantity * UnitPrice')
+).Aggregate := agSum;
+
+// Conditional aggregation
+Summary.Measures.Add(
+  TExpression.FromString(
+    'case when UnitPrice > 50 then Quantity else 0 end'
+  )
+).Aggregate := agSum;
+```
+
+## Performance Tips
+
+<AccordionGroup>
+  <Accordion title="Index Dimensions">
+    Create indexes on columns used in GROUP BY for faster aggregation:
+    ```pascal
+    Data['Category'].CreateIndex;
+    ```
+  </Accordion>
+  
+  <Accordion title="Filter Before Grouping">
+    Use WHERE to reduce data before GROUP BY:
+    ```pascal
+    // Good: Filter first
+    'sum(Stock) where Active = true group by Category'
+    
+    // Less efficient: Filter after
+    'sum(Stock) group by Category, Active having Active = true'
+    ```
+  </Accordion>
+  
+  <Accordion title="Parallel Execution">
+    Enable multi-CPU for large datasets:
+    ```pascal
+    Summary.Parallel := True;  // Use all CPU cores
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+- [SQL Queries](/examples/sql-queries) - Advanced SQL features
+- [Pivot Tables](/examples/pivot-tables) - Multi-dimensional analysis
+- [Charts](/examples/charts) - Visualize aggregated data
+- [Filters](/examples/filters) - Pre-filter before aggregation

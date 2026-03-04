@@ -1,0 +1,367 @@
+---
+title: TBIChart
+description: Chart component for visualizing TeeBI data
+---
+
+## Overview
+
+`TBIChart` automatically creates charts from TDataItem structures. It intelligently selects chart types based on your data.
+
+Location: `VCLBI.Chart.pas:207`
+
+## Properties
+
+### Data
+```pascal
+property Data: TDataItem;
+```
+The data to visualize.
+
+### Chart
+```pascal
+property Chart: TBITChart;
+```
+Access to underlying TeeChart component.
+
+### Options
+```pascal
+property Options: TBIChartOptions;
+```
+Chart configuration and behavior.
+
+## TBIChartOptions
+
+Location: `VCLBI.Chart.pas:124`
+
+### Mode
+```pascal
+property Mode: TBIChartMode default Automatic;
+```
+
+- `Automatic`: Auto-detect best chart type
+- `XY`: Standard 2D charts (Bar, Line, Area, Pie)
+- `ThreeD`: 3D Surface, Grid, Scatter
+- `Financial`: Candle, OHLC charts
+- `Geographic`: Map-based charts
+
+### Items
+```pascal
+property Items: TBIChartItems;
+```
+
+Manually specify which data items to use:
+
+```pascal
+BIChart1.Options.Items.X := MyXColumn;  // Horizontal axis
+BIChart1.Options.Items.Y.Add(MyYColumn);  // Series values
+BIChart1.Options.Items.Z := MyZColumn;  // 3D depth
+BIChart1.Options.Items.Text := MyLabels;  // Point labels
+```
+
+### Direction
+```pascal
+property Direction: TBIChartDirection default Automatic;
+```
+
+- `Automatic`: Choose based on data
+- `Rows`: Each row is a point
+- `Columns`: Each column is a series
+
+### Dimensions
+```pascal
+property Dimensions: TBIChartDimensions default Automatic;
+```
+
+- `Automatic`: 2D or 3D based on data
+- `View2D`: Force 2D view
+- `Orthogonal`: 3D orthogonal projection
+- `View3D`: 3D perspective
+
+### Legend
+```pascal
+property Legend: TBIChartLegend default Automatic;
+```
+
+- `Automatic`: Show when multiple series
+- `Show`: Always show
+- `Hide`: Never show
+
+### Marks
+```pascal
+property Marks: TBIChartMarks default Automatic;
+```
+
+- `Automatic`: Show for small datasets
+- `Show`: Always show point labels
+- `Hide`: Never show
+
+### Title
+```pascal
+property Title: TBIChartTitle default Automatic;
+```
+
+- `Automatic`: Use data name
+- `Custom`: Keep existing title
+
+### Stacked
+```pascal
+property Stacked: TBIChartStacked default Automatic;
+```
+
+- `Automatic`: Based on data
+- `Yes`: Stack series
+- `Stacked100`: Stack to 100%
+- `Side`: Series side by side
+- `No`: Overlapped
+
+### Series2D
+```pascal
+property Series2D: TChartSeriesClass;
+```
+
+Force specific 2D series type (TBarSeries, TLineSeries, TPieSeries, etc.)
+
+### Series3D
+```pascal
+property Series3D: TChartSeriesClass;
+```
+
+Force specific 3D series type (TSurfaceSeries, TPoint3DSeries, etc.)
+
+## Methods
+
+### Fill
+
+Multiple overloads for different data sources:
+
+```pascal
+procedure Fill(const AData: TDataArray);
+procedure Fill(const AItems: TDataItems);
+procedure Fill(const ASummary: TSummary);
+procedure Fill(const AHistogram: THistogram; const ASource: TDataItem);
+procedure Fill(const ACursor: TDataCursor);
+```
+
+### Clear
+```pascal
+procedure Clear;
+```
+Removes all series and resets chart.
+
+### ExchangeXY / ExchangeYZ / ExchangeXZ
+```pascal
+procedure ExchangeXY;
+procedure ExchangeYZ;
+procedure ExchangeXZ;
+```
+Swap axes data.
+
+### SetTwoAxes
+```pascal
+procedure SetTwoAxes;
+```
+Use left and right Y axes for different series.
+
+### SplitAxes
+```pascal
+procedure SplitAxes(const Vertical: Boolean);
+```
+Create separate axis for each series.
+
+## Usage Examples
+
+### Automatic Chart
+
+```pascal
+var
+  Data: TDataItem;
+begin
+  Data := TBICSV.FromFile('sales.csv');
+  BIChart1.Data := Data;  // Automatically creates appropriate chart
+end;
+```
+
+### Specific Chart Type
+
+```pascal
+uses VCLTee.Series;
+
+begin
+  BIChart1.Data := MyData;
+  
+  // Force bar chart
+  BIChart1.Options.Series2D := TBarSeries;
+end;
+```
+
+### 3D Surface Chart
+
+```pascal
+begin
+  BIChart1.Data := My3DData;
+  BIChart1.Options.Mode := TBIChartMode.ThreeD;
+  BIChart1.Options.Dimensions := TBIChartDimensions.View3D;
+end;
+```
+
+### Customized Chart
+
+```pascal
+begin
+  BIChart1.Data := MyData;
+  
+  with BIChart1.Options do
+  begin
+    Items.X := MyData.Items['Date'];
+    Items.Y.Add(MyData.Items['Sales']);
+    Items.Y.Add(MyData.Items['Profit']);
+    
+    Direction := TBIChartDirection.Rows;
+    Legend := TBIChartLegend.Show;
+    Stacked := TBIChartStacked.Yes;
+    Title := TBIChartTitle.Custom;
+  end;
+  
+  BIChart1.Chart.Title.Text.Text := 'Sales vs Profit';
+end;
+```
+
+### Pie Chart from Summary
+
+```pascal
+var
+  Summary: TSummary;
+  Data: TDataItem;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    Summary.Measures.Add(SalesData.Items['Amount'], TAggregate.Sum);
+    Summary.By.Add(SalesData.Items['Category']);
+    
+    BIChart1.Fill(Summary);
+    BIChart1.Options.Series2D := TPieSeries;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+### Financial Chart
+
+```pascal
+var
+  StockData: TDataItem;
+begin
+  // Data with Open, High, Low, Close columns
+  StockData := LoadStockPrices;
+  
+  BIChart1.Data := StockData;
+  BIChart1.Options.Mode := TBIChartMode.Financial;
+end;
+```
+
+### Histogram
+
+```pascal
+var
+  Hist: THistogram;
+begin
+  Hist := THistogram.Create(nil);
+  try
+    Hist.NumBins := 10;
+    BIChart1.Fill(Hist, MyData.Items['Age']);
+  finally
+    Hist.Free;
+  end;
+end;
+```
+
+### Multiple Y Axes
+
+```pascal
+begin
+  // Add series with very different scales
+  BIChart1.Data := MyData;
+  BIChart1.SetTwoAxes;  // Use left & right axes
+  
+  // Or split into separate axes
+  BIChart1.SplitAxes(True);  // Vertical split
+end;
+```
+
+### Access TeeChart Directly
+
+```pascal
+uses VCLTee.TeEngine;
+
+var
+  Series: TChartSeries;
+begin
+  BIChart1.Data := MyData;
+  
+  // Customize first series
+  Series := BIChart1.Chart[0];
+  Series.Marks.Visible := True;
+  Series.Marks.Style := smsValue;
+  
+  // Customize chart
+  BIChart1.Chart.Legend.Alignment := laBottom;
+  BIChart1.Chart.Title.Font.Size := 14;
+end;
+```
+
+### Dynamic Chart Type
+
+```pascal
+uses VCLTee.Series;
+
+procedure TForm1.ComboBox1Change(Sender: TObject);
+begin
+  case ComboBox1.ItemIndex of
+    0: BIChart1.Options.Series2D := TBarSeries;
+    1: BIChart1.Options.Series2D := TLineSeries;
+    2: BIChart1.Options.Series2D := TAreaSeries;
+    3: BIChart1.Options.Series2D := TPieSeries;
+  end;
+end;
+```
+
+## Chart Types
+
+### 2D Series
+
+- `TBarSeries`: Bar chart
+- `THorizBarSeries`: Horizontal bars
+- `TLineSeries`: Line chart
+- `TAreaSeries`: Area chart
+- `TPieSeries`: Pie chart
+- `TPointSeries`: Scatter plot
+
+### 3D Series
+
+- `TSurfaceSeries`: 3D surface
+- `TPoint3DSeries`: 3D scatter
+- `TLineSeries` (3D mode): 3D lines
+
+### Financial Series
+
+- `TCandleSeries`: Candlestick
+- `TOHLCSeries`: OHLC bars
+
+## Events
+
+Use TeeChart events through the Chart property:
+
+```pascal
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  BIChart1.Chart.OnClickSeries := ChartClickSeries;
+end;
+
+procedure TForm1.ChartClickSeries(Sender: TCustomChart;
+  Series: TChartSeries; ValueIndex: Integer; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+begin
+  ShowMessage('Clicked: ' + Series.Labels[ValueIndex]);
+end;
+```

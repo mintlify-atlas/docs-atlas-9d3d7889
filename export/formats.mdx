@@ -1,0 +1,417 @@
+---
+title: Export Formats
+description: Detailed guide for CSV, PDF, HTML, XML, Excel, and JSON export formats
+---
+
+TeeBI supports exporting data to various industry-standard formats.
+
+## CSV Export
+
+Comma-separated values format for universal compatibility.
+
+### Basic CSV Export
+
+```pascal
+uses
+  BI.CSV;
+
+var
+  CSV: TBICSVExport;
+  Data: TDataItem;
+  Text: String;
+begin
+  // Export to string
+  Text := TBICSVExport.AsString(Data);
+  
+  // Save to file
+  TBICSVExport.SaveToFile(Data, 'export.csv');
+end;
+```
+
+### Custom Delimiter
+
+```pascal
+var
+  CSV: TBICSVExport;
+begin
+  CSV := TBICSVExport.Create(nil);
+  try
+    CSV.Delimiter := ';';  // Semicolon
+    CSV.Data := MyData;
+    CSV.SaveToFile('export.csv');
+  finally
+    CSV.Free;
+  end;
+end;
+```
+
+### CSV Import
+
+```pascal
+var
+  CSV: TBICSVImport;
+  Data: TDataItem;
+begin
+  CSV := TBICSVImport.Create(nil);
+  try
+    CSV.FileName := 'import.csv';
+    CSV.Delimiter := ',';
+    CSV.HasHeader := True;
+    
+    Data := CSV.Import;
+  finally
+    CSV.Free;
+  end;
+end;
+```
+
+## PDF Export
+
+Create formatted PDF documents.
+
+### Basic PDF
+
+```pascal
+uses
+  BI.PDF;
+
+var
+  PDF: TBIPDFExport;
+begin
+  PDF := TBIPDFExport.Create(nil);
+  try
+    PDF.Data := MyData;
+    PDF.FileName := 'report.pdf';
+    PDF.Export;
+  finally
+    PDF.Free;
+  end;
+end;
+```
+
+### PDF Options
+
+```pascal
+PDF.Title := 'Sales Report';
+PDF.Author := 'TeeBI';
+PDF.Subject := 'Q4 Sales';
+PDF.Keywords := 'sales, report, quarterly';
+
+// Page settings
+PDF.PageOrientation := poLandscape;
+PDF.PageSize := psA4;
+
+// Fonts
+PDF.FontName := 'Arial';
+PDF.FontSize := 10;
+
+// Grid options
+PDF.ShowGrid := True;
+PDF.GridColor := clSilver;
+PDF.AlternateRowColor := clMoneyGreen;
+```
+
+## HTML Export
+
+Generate HTML tables and pages.
+
+### Basic HTML
+
+```pascal
+uses
+  BI.HTML;
+
+var
+  HTML: TBIHTMLExport;
+begin
+  HTML := TBIHTMLExport.Create(nil);
+  try
+    HTML.Data := MyData;
+    HTML.SaveToFile('table.html');
+  finally
+    HTML.Free;
+  end;
+end;
+```
+
+### HTML Options
+
+```pascal
+HTML.Title := 'Data Export';
+HTML.IncludeCSS := True;     // Embed CSS styling
+HTML.TableBorder := 1;
+HTML.TablePadding := 5;
+HTML.AlternateRows := True;
+HTML.RowColor1 := '#FFFFFF';
+HTML.RowColor2 := '#F0F0F0';
+
+// Custom CSS
+HTML.CustomCSS := 
+  'table { font-family: Arial; }' +
+  'th { background-color: #4CAF50; color: white; }';
+```
+
+### HTML Table Only
+
+```pascal
+var
+  TableHTML: String;
+begin
+  // Just the <table> tags, no HTML/BODY
+  TableHTML := HTML.AsTableString;
+end;
+```
+
+## XML Export
+
+Structured XML documents.
+
+### Basic XML
+
+```pascal
+uses
+  BI.XML;
+
+var
+  XML: TBIXMLExport;
+begin
+  XML := TBIXMLExport.Create(nil);
+  try
+    XML.Data := MyData;
+    XML.SaveToFile('data.xml');
+  finally
+    XML.Free;
+  end;
+end;
+```
+
+### XML Structure
+
+```pascal
+XML.RootName := 'DataSet';        // Root element
+XML.RowName := 'Row';             // Row elements
+XML.IncludeSchema := True;        // Add XSD schema
+XML.IncludeNulls := False;        // Skip null values
+XML.DateTimeFormat := 'ISO8601';  // Date format
+```
+
+### Custom XML Format
+
+```pascal
+XML.OnFormatRow := procedure(const Row: Integer; 
+                              const Element: IXMLNode)
+begin
+  // Add custom attributes
+  Element.Attributes['id'] := Row;
+  Element.Attributes['timestamp'] := DateTimeToStr(Now);
+end;
+```
+
+## Excel Export
+
+Microsoft Excel workbooks (.xlsx).
+
+### Basic Excel
+
+```pascal
+uses
+  BI.Excel;
+
+var
+  Excel: TBIExcelExport;
+begin
+  Excel := TBIExcelExport.Create(nil);
+  try
+    Excel.Data := MyData;
+    Excel.SaveToFile('report.xlsx');
+  finally
+    Excel.Free;
+  end;
+end;
+```
+
+### Excel Options
+
+```pascal
+Excel.SheetName := 'Sales Data';
+Excel.IncludeHeader := True;
+Excel.AutoFitColumns := True;
+Excel.FreezeHeader := True;
+
+// Formatting
+Excel.HeaderBackColor := clNavy;
+Excel.HeaderFontColor := clWhite;
+Excel.HeaderBold := True;
+Excel.AlternateRowColor := clSilver;
+
+// Number formats
+Excel.DateFormat := 'mm/dd/yyyy';
+Excel.CurrencyFormat := '$#,##0.00';
+Excel.NumberFormat := '#,##0.00';
+```
+
+### Multiple Sheets
+
+```pascal
+var
+  Excel: TBIExcelExport;
+begin
+  Excel := TBIExcelExport.Create(nil);
+  try
+    // Add first sheet
+    Excel.SheetName := 'Sales';
+    Excel.Data := SalesData;
+    Excel.AddSheet;
+    
+    // Add second sheet
+    Excel.SheetName := 'Customers';
+    Excel.Data := CustomerData;
+    Excel.AddSheet;
+    
+    // Save workbook
+    Excel.SaveToFile('report.xlsx');
+  finally
+    Excel.Free;
+  end;
+end;
+```
+
+### Charts in Excel
+
+```pascal
+Excel.IncludeChart := True;
+Excel.ChartType := xlColumnClustered;
+Excel.ChartTitle := 'Sales by Region';
+Excel.ChartPosition := 'F2';  // Start at F2
+```
+
+## JSON Export
+
+JavaScript Object Notation.
+
+### Basic JSON
+
+```pascal
+uses
+  BI.JSON;
+
+var
+  JSON: TBIJSONExport;
+begin
+  JSON := TBIJSONExport.Create(nil);
+  try
+    JSON.Data := MyData;
+    JSON.SaveToFile('data.json');
+  finally
+    JSON.Free;
+  end;
+end;
+```
+
+### JSON Format
+
+```pascal
+// Array of objects (default)
+JSON.Format := jfArray;
+// Output: [{"Name":"John","Age":30},{"Name":"Jane","Age":25}]
+
+// Object with arrays
+JSON.Format := jfObject;
+// Output: {"Name":["John","Jane"],"Age":[30,25]}
+
+// Pretty printing
+JSON.Formatted := True;  // Indent and newlines
+JSON.IndentSize := 2;    // 2 spaces
+```
+
+### JSON Options
+
+```pascal
+JSON.IncludeNulls := False;       // Skip null values
+JSON.DateFormat := jdfISO8601;    // ISO date format
+JSON.EncodeStrings := True;       // Escape special chars
+JSON.RootName := 'data';          // Wrap in root object
+```
+
+### JSON Schema
+
+```pascal
+var
+  Schema: String;
+begin
+  // Generate JSON Schema
+  Schema := JSON.GenerateSchema;
+  
+  // Save schema
+  JSON.SaveSchema('schema.json');
+end;
+```
+
+## Batch Export
+
+Export to multiple formats:
+
+```pascal
+uses
+  BI.CSV, BI.Excel, BI.JSON;
+
+procedure ExportAllFormats(const Data: TDataItem; 
+                          const BaseName: String);
+begin
+  // CSV
+  TBICSVExport.SaveToFile(Data, BaseName + '.csv');
+  
+  // Excel
+  var Excel := TBIExcelExport.Create(nil);
+  try
+    Excel.Data := Data;
+    Excel.SaveToFile(BaseName + '.xlsx');
+  finally
+    Excel.Free;
+  end;
+  
+  // JSON
+  var JSON := TBIJSONExport.Create(nil);
+  try
+    JSON.Data := Data;
+    JSON.Formatted := True;
+    JSON.SaveToFile(BaseName + '.json');
+  finally
+    JSON.Free;
+  end;
+end;
+```
+
+## Format Comparison
+
+| Format | Size | Speed | Structure | Formulas | Charts |
+|--------|------|-------|-----------|----------|--------|
+| **CSV** | Smallest | Fastest | Flat | No | No |
+| **Excel** | Large | Slow | Multi-sheet | Yes | Yes |
+| **JSON** | Medium | Fast | Nested | No | No |
+| **XML** | Large | Medium | Nested | No | No |
+| **HTML** | Medium | Fast | Flat | No | No |
+| **PDF** | Medium | Medium | Formatted | No | Yes |
+
+## Format Selection Guide
+
+<Tip>
+  Choose format based on use case:
+  - **CSV** - Database import, Excel compatibility, simple data
+  - **Excel** - Complex reports, charts, formulas
+  - **JSON** - Web APIs, JavaScript integration
+  - **XML** - System integration, data exchange
+  - **HTML** - Web display, email reports
+  - **PDF** - Print-ready documents, archival
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Overview" icon="file-export" href="/export/overview">
+    Export system overview
+  </Card>
+  <Card title="Customization" icon="sliders" href="/export/customization">
+    Customize export settings
+  </Card>
+</CardGroup>

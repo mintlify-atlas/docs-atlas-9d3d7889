@@ -1,0 +1,461 @@
+---
+title: TDataSelect
+description: Perform SELECT queries with filtering, sorting, and pagination
+---
+
+TDataSelect performs SQL SELECT-style queries on TDataItem objects. It provides filtering, sorting, distinct values, and pagination without aggregation.
+
+## Overview
+
+TDataSelect is used for:
+- Selecting specific columns
+- Filtering rows based on conditions
+- Sorting results
+- Removing duplicate rows (DISTINCT)
+- Pagination (LIMIT/OFFSET)
+- Joining related data
+
+## Class Definition
+
+```pascal
+TDataSelect = class(TDataCursor)
+public
+  constructor Create(AOwner: TComponent); override;
+  
+  // Add columns
+  procedure Add(const AData: TDataItem); overload;
+  procedure Add(const AData: TDataItem; const AExpression: String); overload;
+  procedure Add(const AExpression: TExpression); overload;
+  
+  // Execute query
+  function Calculate: TDataItem; overload;
+  procedure Calculate(const AData: TDataItem); overload;
+  
+  // Get main data source
+  function MainData: TDataItem;
+  
+  // Convert to SQL
+  function ToString: String; override;
+  
+published
+  property Distinct: Boolean read FDistinct write FDistinct default False;
+  property Filter: TExpression;
+  property Max: TInteger;        // LIMIT
+  property Start: TInteger;      // OFFSET
+  property SortBy: TSortItems;
+end;
+```
+
+## Properties
+
+### Items
+
+Collection of columns to select. Each item represents a field or expression.
+
+```pascal
+Select.Add(Customers['Name']);
+Select.Add(Customers['Email']);
+Select.Add(Customers['City']);
+```
+
+### Distinct
+
+Remove duplicate rows from results.
+
+```pascal
+Select.Distinct := True;
+Select.Add(Products['Category']);
+// Returns unique categories
+```
+
+### Filter
+
+Expression to filter rows.
+
+```pascal
+Select.Filter := TDataFilter.FromString(Customers, 'Country = "USA" and Age > 25');
+```
+
+### Max (LIMIT)
+
+Maximum number of rows to return.
+
+```pascal
+Select.Max := 10;  // Return maximum 10 rows
+```
+
+### Start (OFFSET)
+
+Number of rows to skip.
+
+```pascal
+Select.Start := 20;  // Skip first 20 rows
+Select.Max := 10;    // Then return 10 rows
+```
+
+### SortBy
+
+Sorting order for results.
+
+```pascal
+Select.SortBy.Items := ...;
+Select.SortBy.Items[0].Data := Customers['Name'];
+Select.SortBy.Items[0].Descending := False;  // Ascending
+```
+
+## Methods
+
+### Add (Column)
+
+Adds a column to the selection.
+
+<ParamField path="AData" type="TDataItem" required>
+  Data field to select
+</ParamField>
+
+```pascal
+Select.Add(Products['Name']);
+Select.Add(Products['Price']);
+```
+
+### Add (Expression)
+
+Adds a computed column.
+
+<ParamField path="AExpression" type="TExpression" required>
+  Expression to evaluate
+</ParamField>
+
+```pascal
+var
+  Expr: TExpression;
+begin
+  Expr := TDataExpression.FromString(Products, 'Price * 1.2');
+  Select.Add(Expr);
+end;
+```
+
+### Calculate
+
+Executes the query and returns results.
+
+**Returns:** TDataItem with selected data
+
+```pascal
+var
+  Result: TDataItem;
+begin
+  Select.Add(Customers['Name']);
+  Select.Add(Customers['Email']);
+  Select.Filter := TDataFilter.FromString(Customers, 'Country = "USA"');
+  
+  Result := Select.Calculate;
+end;
+```
+
+### MainData
+
+Returns the primary data source.
+
+**Returns:** TDataItem
+
+```pascal
+var
+  Main: TDataItem;
+begin
+  Select.Add(Orders['OrderID']);
+  Select.Add(Orders['Total']);
+  
+  Main := Select.MainData;  // Returns Orders
+end;
+```
+
+## Examples
+
+### Basic Selection
+
+```pascal
+var
+  Select: TDataSelect;
+  Result: TDataItem;
+begin
+  Select := TDataSelect.Create(nil);
+  try
+    Select.Add(Customers['Name']);
+    Select.Add(Customers['City']);
+    Select.Add(Customers['Email']);
+    
+    Result := Select.Calculate;
+  finally
+    Select.Free;
+  end;
+end;
+```
+
+### SELECT with WHERE
+
+```pascal
+Select.Add(Products['Name']);
+Select.Add(Products['Price']);
+Select.Filter := TDataFilter.FromString(Products, 'Price > 100 and InStock = true');
+
+Result := Select.Calculate;
+```
+
+### SELECT DISTINCT
+
+```pascal
+Select.Distinct := True;
+Select.Add(Orders['Country']);
+
+Result := Select.Calculate;
+// Returns unique countries
+```
+
+### Sorting
+
+```pascal
+Select.Add(Products['Name']);
+Select.Add(Products['Price']);
+
+Select.SortBy.Items := ...;
+Select.SortBy.Items[0].Data := Products['Price'];
+Select.SortBy.Items[0].Descending := True;  // Highest price first
+
+Result := Select.Calculate;
+```
+
+### Multiple Sort Columns
+
+```pascal
+Select.Add(Customers['Country']);
+Select.Add(Customers['City']);
+Select.Add(Customers['Name']);
+
+// Sort by Country (asc), then City (asc), then Name (asc)
+Select.SortBy.Items := ...;
+Select.SortBy.Items[0].Data := Customers['Country'];
+Select.SortBy.Items[1].Data := Customers['City'];
+Select.SortBy.Items[2].Data := Customers['Name'];
+
+Result := Select.Calculate;
+```
+
+### Pagination
+
+```pascal
+// First page (rows 1-25)
+Select.Start := 0;
+Select.Max := 25;
+Page1 := Select.Calculate;
+
+// Second page (rows 26-50)
+Select.Start := 25;
+Select.Max := 25;
+Page2 := Select.Calculate;
+
+// Third page (rows 51-75)
+Select.Start := 50;
+Select.Max := 25;
+Page3 := Select.Calculate;
+```
+
+### Computed Columns
+
+```pascal
+var
+  FullNameExpr, TotalExpr: TExpression;
+begin
+  // Concatenate first and last name
+  FullNameExpr := TDataExpression.FromString(Customers, 
+    'FirstName + " " + LastName');
+  Select.Add(FullNameExpr);
+  
+  // Calculate total from price and quantity
+  TotalExpr := TDataExpression.FromString(OrderDetails,
+    'Price * Quantity');
+  Select.Add(TotalExpr);
+  
+  Result := Select.Calculate;
+end;
+```
+
+### Case-Insensitive Filtering
+
+```pascal
+Select.Add(Products['Name']);
+Select.Filter := TDataFilter.FromString(Products, 'Lower(Name) = "widget"');
+
+Result := Select.Calculate;
+```
+
+### Complex Filter
+
+```pascal
+Select.Add(Orders['OrderID']);
+Select.Add(Orders['Total']);
+Select.Add(Orders['Status']);
+
+Select.Filter := TDataFilter.FromString(Orders,
+  '(Status = "Pending" or Status = "Processing") and ' +
+  'Year(OrderDate) = 2024 and ' +
+  'Total > 100');
+
+Result := Select.Calculate;
+```
+
+### Joining Related Data
+
+```pascal
+// Automatic join through master-detail relationships
+Select.Add(Orders['OrderID']);
+Select.Add(Orders['OrderDate']);
+Select.Add(Customers['CustomerName']);  // From related table
+Select.Add(Customers['Country']);       // From related table
+
+Result := Select.Calculate;
+// TeeBI automatically joins Orders with Customers
+```
+
+### Using IN Operator
+
+```pascal
+Select.Add(Products['Name']);
+Select.Add(Products['Category']);
+Select.Filter := TDataFilter.FromString(Products,
+  'Category in ["Electronics", "Computers", "Phones"]');
+
+Result := Select.Calculate;
+```
+
+### Date Range
+
+```pascal
+Select.Add(Sales['OrderID']);
+Select.Add(Sales['Date']);
+Select.Add(Sales['Amount']);
+
+Select.Filter := TDataFilter.FromString(Sales,
+  'Date >= Date("2024-01-01") and Date < Date("2024-02-01")');
+
+Result := Select.Calculate;
+```
+
+### Text Search
+
+```pascal
+Select.Add(Products['Name']);
+Select.Add(Products['Description']);
+
+Select.Filter := TDataFilter.FromString(Products,
+  'Lower(Name) contains "smart" or Lower(Description) contains "smart"');
+
+Result := Select.Calculate;
+```
+
+### TOP N Records
+
+```pascal
+// Get top 10 most expensive products
+Select.Add(Products['Name']);
+Select.Add(Products['Price']);
+
+Select.SortBy.Items := ...;
+Select.SortBy.Items[0].Data := Products['Price'];
+Select.SortBy.Items[0].Descending := True;
+
+Select.Max := 10;
+
+Result := Select.Calculate;
+```
+
+### Excluding NULL Values
+
+```pascal
+Select.Add(Customers['Name']);
+Select.Add(Customers['Email']);
+
+Select.Filter := TDataFilter.FromString(Customers,
+  'not IsEmpty(Email)');
+
+Result := Select.Calculate;
+```
+
+### Convert to SQL
+
+```pascal
+var
+  SQL: String;
+begin
+  Select.Add(Orders['OrderID']);
+  Select.Add(Orders['Total']);
+  Select.Filter := TDataFilter.FromString(Orders, 'Total > 100');
+  Select.Max := 50;
+  
+  SQL := Select.ToString;
+  // Result: "select OrderID, Total from Orders where Total > 100 limit 50"
+end;
+```
+
+## Comparison with TSummary
+
+| Feature | TDataSelect | TSummary |
+|---------|-------------|----------|
+| Purpose | Row selection | Aggregation |
+| Grouping | No | Yes |
+| Aggregates | No | Yes (Sum, Count, etc.) |
+| Filtering | Yes (WHERE) | Yes (WHERE and HAVING) |
+| Sorting | Yes | Yes |
+| Distinct | Yes | N/A |
+| Pagination | Yes | No |
+| Pivot Tables | No | Yes |
+
+## Performance Tips
+
+### Index Filters
+
+Use indexed fields in filters for better performance:
+
+```pascal
+// Good: Uses indexed field
+Select.Filter := TDataFilter.FromString(Customers, 'CustomerID = 12345');
+
+// Less optimal: Function on field
+Select.Filter := TDataFilter.FromString(Customers, 'Year(CreatedDate) = 2024');
+```
+
+### Limit Columns
+
+Select only needed columns:
+
+```pascal
+// Good: Select specific columns
+Select.Add(Customers['Name']);
+Select.Add(Customers['Email']);
+
+// Avoid: Select all (use only when needed)
+Select.Add(Customers);  // Selects all columns
+```
+
+### Use Pagination
+
+For large datasets, use pagination:
+
+```pascal
+Select.Max := 1000;   // Process in chunks
+Select.Start := 0;
+
+repeat
+  Batch := Select.Calculate;
+  ProcessBatch(Batch);
+  
+  Select.Start := Select.Start + Select.Max;
+until Batch.Count < Select.Max;
+```
+
+## See Also
+
+- [TBIQuery](/api/tbiquery) - High-level query component
+- [TSummary](/api/tsummary) - Aggregation and grouping
+- [TBISQL](/api/tbisql) - SQL syntax support
+- [TExpression](/api/texpression) - Expression filtering

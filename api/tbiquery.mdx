@@ -1,0 +1,397 @@
+---
+title: TBIQuery
+description: Component for executing SQL-like queries with dimensions, measures, filters, and sorting
+---
+
+TBIQuery is a high-level component that provides a visual, property-based interface for building queries. It automatically determines whether to use TDataSelect (for simple queries) or TSummary (for aggregations).
+
+## Overview
+
+TBIQuery combines the functionality of TDataSelect and TSummary into a single component:
+- **Dimensions**: Fields to select or group by
+- **Measures**: Aggregated calculations (Sum, Count, Average, etc.)
+- **Filter**: Data filtering conditions
+- **SortBy**: Result ordering
+
+## Class Definition
+
+```pascal
+TBIQuery = class(TBaseDataImporter)
+public
+  // Constructor
+  constructor Create(AOwner: TComponent); override;
+  
+  // Create from existing providers
+  constructor From(const AOwner: TComponent; const ASelect: TDataSelect); overload;
+  constructor From(const AOwner: TComponent; const ASummary: TSummary); overload;
+  
+  // Execute query
+  function Calculate: TDataItem;
+  
+  // Parse SQL
+  procedure Parse(const AData: TDataItem; const SQL: String; const AError: TBIErrorProc = nil);
+  
+  // Clear all settings
+  procedure Clear;
+  
+  // Refresh data
+  procedure Refresh;
+  
+  // Convert to SQL
+  function ToString: String; override;
+  
+  // Utility
+  class function CanBeMeasure(const AData: TDataItem): Boolean; static;
+  
+published
+  property Dimensions: TQueryDimensions read FDimensions write SetDimensions;
+  property Measures: TQueryMeasures read FMeasures write SetMeasures;
+  property Filter: TBIFilter read FFilter write SetFilter;
+  property SortBy: TQuerySort read FSort write SetSort;
+  property Distinct: Boolean read FDistinct write SetDistinct default False;
+  property MaxRows: Int64 read FMax write SetMax default 0;
+  property StartRow: Int64 read FStart write SetStartRow default 0;
+  property RemoveMissing: TRemoveMissing read FRemoveMissing write SetRemoveMissing;
+end;
+```
+
+## Properties
+
+### Dimensions
+
+Collection of fields to select or group by.
+
+```pascal
+Query.Dimensions.Add(Data['Country'], TDimensionStyle.Row);
+Query.Dimensions.Add(Data['Category'], TDimensionStyle.Column);
+```
+
+**TDimensionStyle values:**
+- `Automatic`: Let TeeBI decide the layout
+- `Row`: Place in rows (for summaries)
+- `Column`: Place in columns (for summaries)
+
+### Measures
+
+Collection of aggregated calculations.
+
+```pascal
+Query.Measures.Add(Data['Sales'], TAggregate.Sum);
+Query.Measures.Add(Data['OrderID'], TAggregate.Count);
+```
+
+**Available aggregates:**
+- `Count`: Count of non-null values
+- `Sum`: Total sum
+- `Average`: Mean value
+- `Minimum`: Smallest value
+- `Maximum`: Largest value
+- `First`: First value
+- `Last`: Last value
+
+### Filter
+
+Filtering conditions applied to the data.
+
+```pascal
+Query.Filter.Text := 'Country = "USA" and Sales > 1000';
+// or
+Query.Filter.Custom := MyExpression;
+```
+
+### SortBy
+
+Ordering of results.
+
+```pascal
+Query.SortBy.AddSort(Data['Sales'], False); // Descending
+Query.SortBy.AddSort(Data['Country'], True); // Ascending
+```
+
+### Distinct
+
+Remove duplicate rows from results.
+
+```pascal
+Query.Distinct := True;
+```
+
+### MaxRows / StartRow
+
+Pagination support.
+
+```pascal
+Query.MaxRows := 50;    // Return max 50 rows
+Query.StartRow := 100;  // Skip first 100 rows
+```
+
+### RemoveMissing
+
+Control how missing (null) values are handled in summaries.
+
+```pascal
+Query.RemoveMissing.Rows := True;     // Remove rows with all missing values
+Query.RemoveMissing.Columns := True;  // Remove columns with all missing values
+```
+
+## Methods
+
+### Calculate
+
+Executes the query and returns the result.
+
+**Returns:** TDataItem with query results
+
+```pascal
+var
+  Result: TDataItem;
+begin
+  Query.Dimensions.Add(Data['Country']);
+  Query.Measures.Add(Data['Sales'], TAggregate.Sum);
+  
+  Result := Query.Calculate;
+  // Result contains aggregated data by Country
+end;
+```
+
+### Parse
+
+Parses SQL syntax and configures the query.
+
+<ParamField path="AData" type="TDataItem" required>
+  Source data item
+</ParamField>
+
+<ParamField path="SQL" type="String" required>
+  SQL query string
+</ParamField>
+
+<ParamField path="AError" type="TBIErrorProc">
+  Optional error handler
+</ParamField>
+
+```pascal
+Query.Parse(MyData, 'select Country, Sum(Sales) from Data group by Country');
+// Query is now configured with Country dimension and Sales measure
+```
+
+### Clear
+
+Resets all query settings.
+
+```pascal
+Query.Clear;
+// All dimensions, measures, filters, and sort orders are removed
+```
+
+### ToString
+
+Converts the query to SQL syntax.
+
+**Returns:** SQL string representation
+
+```pascal
+var
+  SQL: String;
+begin
+  SQL := Query.ToString;
+  ShowMessage(SQL);
+end;
+```
+
+## Query Types
+
+TBIQuery automatically determines the query type:
+
+### SELECT Query
+
+Created when there are **no measures**:
+
+```pascal
+Query.Clear;
+Query.Dimensions.Add(Data['Name']);
+Query.Dimensions.Add(Data['City']);
+Query.Filter.Text := 'Age > 25';
+
+// Generates: SELECT Name, City FROM Data WHERE Age > 25
+```
+
+### SUMMARY Query
+
+Created when there are **one or more measures**:
+
+```pascal
+Query.Clear;
+Query.Dimensions.Add(Data['Country']);
+Query.Measures.Add(Data['Sales'], TAggregate.Sum);
+
+// Generates: SELECT Country, Sum(Sales) FROM Data GROUP BY Country
+```
+
+## Examples
+
+### Simple Selection
+
+```pascal
+var
+  Query: TBIQuery;
+  Result: TDataItem;
+begin
+  Query := TBIQuery.Create(nil);
+  try
+    Query.Data := MyData;
+    Query.Dimensions.Add(MyData['Name']);
+    Query.Dimensions.Add(MyData['Email']);
+    
+    Result := Query.Calculate;
+  finally
+    Query.Free;
+  end;
+end;
+```
+
+### Aggregation by Single Dimension
+
+```pascal
+Query.Clear;
+Query.Dimensions.Add(Sales['Country']);
+Query.Measures.Add(Sales['Amount'], TAggregate.Sum);
+Query.Measures.Add(Sales['OrderID'], TAggregate.Count);
+
+Result := Query.Calculate;
+```
+
+### Multi-Dimensional Aggregation
+
+```pascal
+Query.Dimensions.Add(Sales['Year'], TDimensionStyle.Row);
+Query.Dimensions.Add(Sales['Quarter'], TDimensionStyle.Row);
+Query.Dimensions.Add(Sales['Product'], TDimensionStyle.Column);
+Query.Measures.Add(Sales['Revenue'], TAggregate.Sum);
+
+Result := Query.Calculate;
+// Creates a pivot table with Year/Quarter in rows and Products in columns
+```
+
+### Date Part Grouping
+
+```pascal
+var
+  Dimension: TQueryDimension;
+begin
+  Dimension := Query.Dimensions.Add(Orders['OrderDate']);
+  Dimension.DatePart := TDateTimePart.Month;
+  
+  Query.Measures.Add(Orders['Total'], TAggregate.Sum);
+  
+  Result := Query.Calculate;
+  // Groups by month
+end;
+```
+
+### Filtering
+
+```pascal
+Query.Dimensions.Add(Products['Category']);
+Query.Measures.Add(Products['Price'], TAggregate.Average);
+Query.Filter.Text := 'InStock = true and Price > 10';
+
+Result := Query.Calculate;
+```
+
+### Sorting Results
+
+```pascal
+Query.Dimensions.Add(Sales['Country']);
+Query.Measures.Add(Sales['Revenue'], TAggregate.Sum);
+Query.SortBy.AddSort(Sales['Revenue'], False); // Descending by revenue
+
+Result := Query.Calculate;
+```
+
+### Using Expressions
+
+```pascal
+var
+  Dimension: TQueryDimension;
+  Expression: TExpression;
+begin
+  // Create expression: Upper(Country)
+  Expression := TDataExpression.FromString(Data, 'Upper(Country)');
+  
+  Dimension := Query.Dimensions.Add(nil);
+  Dimension.Expression := Expression;
+  
+  Query.Measures.Add(Data['Sales'], TAggregate.Sum);
+  
+  Result := Query.Calculate;
+end;
+```
+
+### Pagination
+
+```pascal
+Query.Dimensions.Add(Customers['Name']);
+Query.SortBy.AddSort(Customers['Name'], True);
+Query.StartRow := 0;
+Query.MaxRows := 25;
+
+// Get first page
+Page1 := Query.Calculate;
+
+Query.StartRow := 25;
+// Get second page
+Page2 := Query.Calculate;
+```
+
+### Loading from SQL
+
+```pascal
+Query.Parse(MyData, 
+  'select Category, Year(Date), Sum(Sales) ' +
+  'from Data ' +
+  'where Country = "USA" ' +
+  'group by Category, Year(Date) ' +
+  'order by Sum(Sales) desc');
+  
+Result := Query.Calculate;
+```
+
+## Dimension and Measure Configuration
+
+### TQueryDimension Properties
+
+```pascal
+type
+  TQueryDimension = class
+  published
+    property Data: TDataItem;                    // Source field
+    property Expression: TExpression;            // Or use expression
+    property DatePart: TDateTimePart;            // Extract date part
+    property Histogram: THistogram;              // Bin numeric values
+    property Style: TDimensionStyle;             // Row/Column/Automatic
+    property Enabled: Boolean;                   // Enable/disable
+  end;
+```
+
+### TQueryMeasure Properties
+
+```pascal
+type
+  TQueryMeasure = class
+  published
+    property Data: TDataItem;                    // Source field
+    property Expression: TExpression;            // Or use expression
+    property Aggregate: TAggregate;              // Sum, Count, etc.
+    property Calculation: TMeasureCalculation;   // Running totals, percentages
+    property Missing: TMeasureMissing;           // Handle null values
+    property Enabled: Boolean;                   // Enable/disable
+  end;
+```
+
+## See Also
+
+- [TBISQL](/api/tbisql) - SQL parser and generator
+- [TSummary](/api/tsummary) - Aggregation engine
+- [TDataSelect](/api/tdataselect) - Selection and filtering
+- [TExpression](/api/texpression) - Expression evaluation

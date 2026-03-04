@@ -1,0 +1,102 @@
+---
+title: Performance Optimization
+description: Learn about TeeBI's ultra-fast speed and performance characteristics
+---
+
+## Overview
+
+TeeBI is designed for ultra-fast data processing through its array-based architecture. Every column or field is stored as a simple contiguous array, providing optimal memory locality and cache performance.
+
+## Array-Based Architecture
+
+### Column Storage
+
+TeeBI stores data in columnar format, where each column is represented as a native array:
+
+```pascal
+TInt32Array = Array of Integer;
+TInt64Array = Array of Int64;
+TSingleArray = Array of Single;
+TDoubleArray = Array of Double;
+TTextArray = Array of String;
+TDateTimeArray = Array of TDateTime;
+TBooleanArray = Array of Boolean;
+```
+
+### Performance Benefits
+
+**Memory Locality**: Contiguous array storage means better CPU cache utilization and faster memory access patterns.
+
+**Pointer Math**: Enabled with `{$POINTERMATH ON}` for direct pointer arithmetic on arrays, avoiding overhead.
+
+**Precision Control**: Uses `{$EXCESSPRECISION OFF}` on x64 for faster floating-point operations with acceptable precision.
+
+**Native Types**: Uses `TInteger = NativeInt` to automatically optimize for 32-bit or 64-bit architecture.
+
+## Hybrid Sorting Algorithms
+
+TeeBI uses optimized sorting algorithms combining QuickSort and InsertionSort:
+
+- **QuickSort** for large segments
+- **InsertionSort** for small segments where it outperforms QuickSort
+- Automatic algorithm selection based on data size
+
+## Speed Benchmarks
+
+See the [Speed demo](https://github.com/Steema/BI/tree/master/demos/delphi/vcl/Speed) for performance comparisons with other data structures.
+
+### Key Performance Metrics
+
+- **In-Memory Operations**: Direct array access without abstraction overhead
+- **No Dependencies**: Pure Pascal RTL implementation, no database server required
+- **Zero-Copy**: Many operations work directly on array pointers
+
+## Best Practices
+
+### Pre-allocate Memory
+
+When building large datasets, pre-allocate array sizes to avoid repeated reallocations:
+
+```pascal
+Data.Resize(ExpectedRowCount);
+```
+
+### Use Appropriate Data Types
+
+Choose the smallest data type that fits your needs:
+
+- Use `Int32` instead of `Int64` when values fit in 32 bits
+- Use `Single` instead of `Double` for reduced precision requirements
+
+### Leverage Parallel Processing
+
+For large datasets, use parallel operations (see [Parallel Processing](/advanced/parallel-processing)).
+
+### Enable Compression
+
+When persisting or transmitting data, use compression to reduce I/O time (see [Compression](/advanced/compression)).
+
+## Performance Monitoring
+
+Use Delphi's profiling tools to identify bottlenecks:
+
+- **Sampling Profiler**: Available in RAD Studio
+- **Stopwatch**: Use `TStopwatch` from `System.Diagnostics`
+
+```pascal
+uses System.Diagnostics;
+
+var SW: TStopwatch;
+SW := TStopwatch.StartNew;
+
+// Your TeeBI operations here
+
+SW.Stop;
+ShowMessage('Elapsed: ' + SW.ElapsedMilliseconds.ToString + ' ms');
+```
+
+## Related Topics
+
+- [Big Data Support](/advanced/big-data)
+- [Parallel Processing](/advanced/parallel-processing)
+- [Compression](/advanced/compression)

@@ -1,0 +1,138 @@
+---
+title: TBIJSON
+description: JSON data import and export class
+---
+
+## Overview
+
+`TBIJSON` imports and exports JSON data to and from TeeBI data structures. Supports both standard JSON objects and JSON array formats.
+
+Location: `BI.JSON.pas:40`
+
+## Constructor
+
+```pascal
+Constructor Create(const Definition: TDataDefinition = nil; const MultiThread: Boolean = False);
+```
+
+## Properties
+
+### Format
+```pascal
+Format: TBIJSONFormat;
+```
+- `Normal`: Standard JSON object format
+- `Array`: MongoDB-style format (one object per line)
+
+### EngineClass
+```pascal
+class var EngineClass: TJSONEngineClass;
+```
+Pluggable JSON parsing engine (uses platform default if not set).
+
+## Methods
+
+### Import from File
+```pascal
+function ImportFile(const FileName: String): TDataArray;
+```
+Imports a JSON file.
+
+### Import from Text
+```pascal
+function ImportText(const Text: String): TDataItem;
+```
+Imports JSON from a string.
+
+### Import from Strings
+```pascal
+function Import(const Strings: TStrings): TDataArray;
+```
+Imports JSON from string list. For array format, processes one object per line.
+
+### FromFile (Class Method)
+```pascal
+class function FromFile(const AFileName: String; const AFormat: TBIJSONFormat): TDataItem;
+```
+Static method to import JSON file with specified format.
+
+## Supported File Types
+
+```pascal
+class function Supports(const Extension: String): Boolean;
+```
+Supports: `.json`
+
+## Usage Example
+
+```pascal
+var
+  JSON: TBIJSON;
+  Data: TDataItem;
+begin
+  JSON := TBIJSON.Create;
+  try
+    // Standard JSON format
+    JSON.Format := TBIJSONFormat.Normal;
+    Data := TBISource.FromData(JSON.ImportFile('data.json'));
+    
+    // MongoDB array format
+    JSON.Format := TBIJSONFormat.Array;
+    Data := TBISource.FromData(JSON.ImportFile('records.json'));
+  finally
+    JSON.Free;
+  end;
+end;
+```
+
+---
+
+## TBIJSONExport
+
+Location: `BI.JSON.pas:72`
+
+Export class for creating JSON files.
+
+### Properties
+
+```pascal
+Header: Boolean;  // Include metadata header
+```
+
+### AsString (Class Method)
+
+```pascal
+class function AsString(const AData: TDataItem; const Header: Boolean): String;
+```
+Converts data to JSON string.
+
+### Usage Example
+
+```pascal
+var
+  Export: TBIJSONExport;
+  JSON: String;
+begin
+  Export := TBIJSONExport.Create;
+  try
+    Export.Header := True;
+    Export.Data := MyData;
+    JSON := Export.AsString;
+    
+    // Or save to file
+    Export.SaveToFile('output.json');
+  finally
+    Export.Free;
+  end;
+end;
+```
+
+## JSON Structure
+
+TeeBI converts JSON data types automatically:
+- JSON numbers → Int32, Int64, or Double
+- JSON strings → Text
+- JSON booleans → Boolean
+- JSON objects → Nested TDataItem tables
+- JSON arrays → Detail data with master-detail relationships
+- JSON null → Missing values

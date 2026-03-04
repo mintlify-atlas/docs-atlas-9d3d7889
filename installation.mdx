@@ -1,0 +1,180 @@
+---
+title: "Installation"
+description: "How to install and configure TeeBI in your development environment"
+---
+
+## Installation overview
+
+TeeBI provides an automatic installation tool that detects your IDEs, recompiles packages, and configures library paths. Follow the steps below to get TeeBI installed and ready to use.
+
+## Prerequisites
+
+Before installing TeeBI, ensure you have:
+
+- **RAD Studio XE4 or later** (Delphi or C++), or **Lazarus v4** with FreePascal 3.2.2
+- **Administrator privileges** (required for copying files to Windows system folders)
+- **Git** (optional, for cloning the repository)
+
+<Note>
+For macOS, iOS, and Linux platforms, ensure the appropriate RAD Studio SDKs are already installed before running the TeeBI installation tool.
+</Note>
+
+## Installation steps
+
+<Steps>
+  <Step title="Download or clone TeeBI">
+    Get the TeeBI source code from the repository:
+
+    ```bash
+    git clone https://github.com/Steema/BI.git
+    ```
+
+    Or download the ZIP file and extract it to a local directory.
+  </Step>
+
+  <Step title="Extract the installer tool">
+    Navigate to the `install` folder in the TeeBI repository and extract the contents of `TeeBIRecompile.zip`.
+
+    This archive contains the automatic installation tool `TeeBIRecompile.exe`.
+  </Step>
+
+  <Step title="Run the installer as Administrator">
+    Right-click `TeeBIRecompile.exe` and select "Run as Administrator".
+
+    <Warning>
+    Administrator mode is required because the installer copies runtime BPL packages to Windows system folders (System32/SysWOW64).
+    </Warning>
+
+    The installer will:
+    - Detect all supported Delphi/C++ RAD Studio IDEs installed on your system
+    - Check for TeeChart installations (Lite, Standard, or Pro versions)
+    - Allow you to select platforms for recompilation
+    - Recompile TeeBI packages from the `packages\Temp` subfolder
+    - Install design-time packages (DCLVCLxxx and DCLFMXxxx)
+    - Copy runtime BPL packages to Windows system folders
+    - Configure search, library, and browsing paths automatically
+  </Step>
+
+  <Step title="Verify installation">
+    Open your IDE and verify that TeeBI components appear in the Tool Palette:
+    - **VCL**: Look for `TBIGrid` and `TBIChart` components
+    - **FireMonkey**: Look for FMX equivalents
+
+    You can also check that the library paths have been added:
+    - Go to **Tools > Options > Language > Delphi > Library**
+    - Verify that TeeBI source paths appear in the Library Path
+  </Step>
+</Steps>
+
+## Lazarus/FreePascal installation
+
+For Lazarus developers:
+
+<Steps>
+  <Step title="Locate Lazarus units">
+    TeeBI units compatible with Lazarus are copied to the `sources\Lazarus` folder during package compilation.
+
+    <Info>
+    Some units that are not compatible or not yet ported to Lazarus are excluded from this folder.
+    </Info>
+  </Step>
+
+  <Step title="Open the TeeBI package">
+    In Lazarus IDE, open the `TeeBI.lpk` package file located in the packages folder.
+  </Step>
+
+  <Step title="Configure source paths">
+    When rebuilding the TeeBI package inside Lazarus, you may need to add the "Sources" path manually:
+
+    - Go to **Tools > Options**
+    - Add the TeeBI sources path to the compiler search paths
+  </Step>
+
+  <Step title="Compile and install">
+    Compile and install the TeeBI package within Lazarus IDE.
+  </Step>
+</Steps>
+
+## Add TeeBI units to your project
+
+Once installed, add TeeBI units to your Delphi/Pascal project's uses clause:
+
+```pascal
+uses
+  BI.DataItem,   // Core TDataItem class
+  BI.CSV,        // CSV import/export
+  BI.Db,         // Database import
+  BI.Json,       // JSON import/export
+  BI.Xml,        // XML import/export
+  BI.SQL,        // SQL-like queries
+  VCLBI.Grid,    // TBIGrid component (VCL)
+  VCLBI.Chart;   // TBIChart component (VCL)
+```
+
+For FireMonkey applications, use the FMX equivalents:
+
+```pascal
+uses
+  BI.DataItem,
+  BI.CSV,
+  BI.Db,
+  FMXBI.Grid,    // TBIGrid component (FMX)
+  FMXBI.Chart;   // TBIChart component (FMX)
+```
+
+## Platform-specific considerations
+
+### Windows
+
+No additional configuration required. The installer handles all necessary setup.
+
+### macOS, iOS, and Linux
+
+<Warning>
+Before selecting these platforms in the installer, ensure you have already installed the RAD Studio SDKs for the target platforms.
+</Warning>
+
+The installer will recompile packages for selected platforms, but the base SDK must be present.
+
+### Mobile platforms (Android/iOS)
+
+Mobile platforms require FireMonkey. Use the FMX-specific TeeBI units:
+
+```pascal
+uses
+  FMXBI.Grid, FMXBI.Chart;
+```
+
+## Troubleshooting
+
+<Accordion title="TeeBI components don't appear in the Tool Palette">
+  Ensure the design-time packages were installed successfully:
+  - Go to **Component > Install Packages**
+  - Verify that DCLVCLTeeBIxxx or DCLFMXTeeBIxxx packages are listed
+  - If missing, manually install from the compiled BPL files
+</Accordion>
+
+<Accordion title="Compilation errors about missing units">
+  Check that library paths are configured correctly:
+  - Go to **Tools > Options > Language > Delphi > Library**
+  - Ensure TeeBI source paths are present
+  - For Lazarus, add paths manually in IDE Options
+</Accordion>
+
+<Accordion title="Administrator rights error">
+  The installer requires administrator privileges to copy BPL files to system folders:
+  - Right-click `TeeBIRecompile.exe`
+  - Select "Run as Administrator"
+  - Accept the UAC prompt
+</Accordion>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Build your first TeeBI application
+  </Card>
+  <Card title="Core concepts" icon="book" href="/core-concepts">
+    Learn about TDataItem and TeeBI architecture
+  </Card>
+</CardGroup>

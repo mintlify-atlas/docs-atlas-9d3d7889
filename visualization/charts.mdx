@@ -1,0 +1,312 @@
+---
+title: Chart Visualization
+description: Display data using TBIChart with automatic chart type selection
+---
+
+The `TBIChart` component automatically creates charts from data with intelligent type detection.
+
+## Basic Usage
+
+```pascal
+uses
+  VCLBI.Chart;  // or FMXBI.Chart for FireMonkey
+
+var
+  Chart: TBIChart;
+begin
+  Chart := TBIChart.Create(Owner);
+  Chart.Parent := Self;
+  Chart.Align := alClient;
+  
+  // Assign data - chart type selected automatically
+  Chart.Data := SalesData;
+end;
+```
+
+See `VCLBI.Chart.pas:207` for the `TBIChart` class definition.
+
+## Chart Types
+
+TeeBI supports all TeeChart series types:
+
+- Bar, Column, Horizontal Bar
+- Line, Area, Points
+- Pie, Doughnut
+- 3D Surface, Grid, XYZ
+- Candlestick, OHLC (financial)
+- Map (geographic)
+
+### Automatic Selection
+
+TeeBI chooses based on data characteristics:
+
+```pascal
+// Numeric with categories -> Bar chart
+Chart.Data := DataWithCategories;
+
+// Time series -> Line chart  
+Chart.Data := TimeSeriesData;
+
+// Geographic names -> Map
+Chart.Data := CountryData;
+```
+
+See `VCLBI.Chart.pas:1038-1052` for selection logic.
+
+### Manual Selection
+
+```pascal
+// Force specific 2D chart type
+Chart.Options.Series2D := TBarSeries;
+Chart.Options.Series2D := TLineSeries;
+Chart.Options.Series2D := TPieSeries;
+
+// Force specific 3D type
+Chart.Options.Series3D := TSurfaceSeries;
+```
+
+See `VCLBI.Chart.pas:180-181` for series properties.
+
+## Chart Modes
+
+Control visualization mode using `TBIChartMode`:
+
+```pascal
+type
+  TBIChartMode = (Automatic, XY, ThreeD, Financial, Geographic);
+```
+
+### XY Mode (2D Charts)
+
+```pascal
+Chart.Options.Mode := TBIChartMode.XY;
+Chart.Data := Data;
+```
+
+Creates 2D charts: bar, line, pie, area, points.
+
+### 3D Mode
+
+```pascal
+Chart.Options.Mode := TBIChartMode.ThreeD;
+Chart.Options.XYZMode := TBIChart3DMode.Grid;  // or Table, XYZ
+Chart.Data := Data;
+```
+
+See `VCLBI.Chart.pas:1055-1091` for 3D chart creation.
+
+### Financial Mode
+
+```pascal
+Chart.Options.Mode := TBIChartMode.Financial;
+Chart.Data := StockData;  // Requires Open, High, Low, Close
+```
+
+See `VCLBI.Chart.pas:1174-1180` for financial charts.
+
+### Geographic Mode
+
+```pascal
+Chart.Options.Mode := TBIChartMode.Geographic;
+Chart.Data := CountryData;
+```
+
+See `VCLBI.Chart.pas:1193-1194` for geographic charts.
+
+## Chart Options
+
+Configure using `TBIChartOptions` (`VCLBI.Chart.pas:124`):
+
+### View Dimensions
+
+```pascal
+Chart.Options.Dimensions := TBIChartDimensions.View3D;  
+// Automatic, View2D, Orthogonal, View3D
+```
+
+### Legend
+
+```pascal
+Chart.Options.Legend := TBIChartLegend.Show;  
+// Automatic, Show, Hide
+```
+
+### Value Marks
+
+```pascal
+Chart.Options.Marks := TBIChartMarks.Show;  
+// Automatic, Show, Hide
+```
+
+### Stacking
+
+```pascal
+Chart.Options.Stacked := TBIChartStacked.Yes;
+// Automatic, No, Yes, Stacked100, Side, SideAll, SelfStack
+```
+
+### Direction
+
+```pascal
+Chart.Options.Direction := TBIChartDirection.Rows;
+// Automatic, Rows, Columns
+```
+
+See `VCLBI.Chart.pas:183-199` for all options.
+
+## Data Items Configuration
+
+Control which fields map to X, Y, Z axes using `TBIChartItems`:
+
+```pascal
+var
+  Items: TBIChartItems;
+begin
+  Items := Chart.Options.Items;
+  
+  // Manually assign fields
+  Items.X := Data['Month'];       // Horizontal axis
+  Items.Y.Add(Data['Sales']);     // Values (can be multiple)
+  Items.Z := Data['Quantity'];    // Z-axis for 3D
+  Items.Text := Data['Category']; // Labels
+  Items.Colors := Data['Status']; // Color mapping
+end;
+```
+
+See `VCLBI.Chart.pas:57-108` for `TBIChartItems`.
+
+## Multiple Series
+
+Add multiple data series:
+
+```pascal
+var
+  Data: TDataArray;
+begin
+  SetLength(Data, 3);
+  Data[0] := Sales['Product A'];
+  Data[1] := Sales['Product B'];
+  Data[2] := Sales['Product C'];
+  
+  Chart.Fill(Data);
+end;
+```
+
+See `VCLBI.Chart.pas:261` for the `Fill` method.
+
+## Axes Configuration
+
+### Dual Axes
+
+```pascal
+// Use two Y axes
+Chart.SetTwoAxes;
+```
+
+See `VCLBI.Chart.pas:270` for `SetTwoAxes`.
+
+### Split Axes
+
+```pascal
+// Split into multiple vertical axes
+Chart.SplitAxes(True);  // Vertical split
+
+// Split into multiple horizontal axes
+Chart.SplitAxes(False); // Horizontal split
+```
+
+See `VCLBI.Chart.pas:271` for `SplitAxes`.
+
+## Customization
+
+Access underlying TeeChart:
+
+```pascal
+var
+  Series: TChartSeries;
+begin
+  // Access TeeChart control
+  Chart.Chart.Title.Text := 'Sales Report';
+  Chart.Chart.Legend.Visible := True;
+  
+  // Customize series
+  Series := Chart.Chart[0];
+  Series.Color := clRed;
+  
+  // Add tools
+  Chart.Chart.Tools.Add(TColorLineTool.Create(Chart));
+end;
+```
+
+See `VCLBI.Chart.pas:273` for the `Chart` property.
+
+## Exchange Axes
+
+Swap X and Y axes:
+
+```pascal
+Chart.ExchangeXY;  // Horizontal <-> Vertical
+Chart.ExchangeXZ;  // X <-> Z for 3D
+Chart.ExchangeYZ;  // Y <-> Z for 3D
+```
+
+See `VCLBI.Chart.pas:232-234` for exchange methods.
+
+## Complete Example
+
+```pascal
+uses
+  VCLBI.Chart, BI.DataItem, BI.Summary;
+
+procedure CreateSalesChart;
+var
+  Chart: TBIChart;
+  Summary: TSummary;
+  Data: TDataItem;
+begin
+  // Create chart
+  Chart := TBIChart.Create(Self);
+  Chart.Parent := Self;
+  Chart.Align := alClient;
+  
+  // Configure options
+  with Chart.Options do
+  begin
+    Mode := TBIChartMode.XY;
+    Legend := TBIChartLegend.Show;
+    Marks := TBIChartMarks.Hide;
+    Stacked := TBIChartStacked.No;
+  end;
+  
+  // Create pivot summary
+  Summary := TSummary.Create(nil);
+  try
+    Data := LoadSalesData;
+    
+    Summary.AddGroupBy(Data['Region']);
+    Summary.AddGroupBy(Data['Quarter']);
+    Summary.AddMeasure(Data['Amount'], TAggregate.Sum);
+    
+    // Display in chart
+    Chart.Fill(Summary);
+  finally
+    Summary.Free;
+  end;
+  
+  // Customize TeeChart
+  Chart.Chart.Title.Text := 'Quarterly Sales by Region';
+  Chart.Chart.BottomAxis.Title.Caption := 'Region';
+  Chart.Chart.LeftAxis.Title.Caption := 'Sales ($)';
+end;
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Grids" icon="table" href="/visualization/grids">
+    Display data in grid format
+  </Card>
+  <Card title="Geographic" icon="globe" href="/visualization/geographic">
+    Create map visualizations
+  </Card>
+</CardGroup>

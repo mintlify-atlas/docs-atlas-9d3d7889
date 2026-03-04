@@ -1,0 +1,275 @@
+---
+title: TBISQL
+description: Convert between SQL strings and TeeBI query objects
+---
+
+TBISQL is a record type that provides static methods to convert between SQL syntax and TeeBI query objects (TDataSelect, TSummary, TBIQuery).
+
+## Overview
+
+TBISQL acts as a bidirectional translator:
+- **SQL to Objects**: Parse SQL strings into query provider objects
+- **Objects to SQL**: Generate SQL syntax from query objects
+
+This enables both programmatic query construction and SQL-based data manipulation.
+
+## Class Definition
+
+```pascal
+TBISSQL = record
+public
+  // Convert provider to SQL
+  class function From(const AProvider: TDataProvider): String; overload; static;
+  
+  // Convert TDataSelect to SQL
+  class function From(const ASelect: TDataSelect): String; overload; static;
+  
+  // Convert TSummary to SQL
+  class function From(const ASummary: TSummary): String; overload; static;
+  
+  // Convert TDataItem to SQL
+  class function From(const AData: TDataItem): String; overload; static;
+  
+  // Parse and execute SQL
+  class function From(const AData: TDataItem; 
+                      const SQL: String;
+                      const GetData: TGetDataProc = nil;
+                      const ErrorProc: TBIErrorProc = nil): TDataItem; overload; static;
+  
+  // Parse SQL to provider
+  class function ProviderFrom(const AData: TDataItem; 
+                              const SQL: String;
+                              const GetData: TGetDataProc = nil;
+                              const ErrorProc: TBIErrorProc = nil): TDataProvider; static;
+end;
+```
+
+## Methods
+
+### From (Provider to SQL)
+
+Converts a data provider object to its SQL representation.
+
+<ParamField path="AProvider" type="TDataProvider" required>
+  The provider object to convert (TDataSelect or TSummary)
+</ParamField>
+
+**Returns:** SQL string representation
+
+```pascal
+var
+  Summary: TSummary;
+  SQL: String;
+begin
+  Summary := TSummary.Create(nil);
+  Summary.AddMeasure(Data['Sales'], TAggregate.Sum);
+  Summary.AddGroupBy(Data['Country']);
+  
+  SQL := TBISQL.From(Summary);
+  // Result: "select Country, Sum(Sales) from Data group by Country"
+end;
+```
+
+### From (SQL to Data)
+
+Parses SQL syntax, executes the query, and returns the result.
+
+<ParamField path="AData" type="TDataItem" required>
+  Source data item to query
+</ParamField>
+
+<ParamField path="SQL" type="String" required>
+  SQL query string
+</ParamField>
+
+<ParamField path="GetData" type="TGetDataProc">
+  Optional callback to resolve data names
+</ParamField>
+
+<ParamField path="ErrorProc" type="TBIErrorProc">
+  Optional error handling callback
+</ParamField>
+
+**Returns:** TDataItem with query results
+
+```pascal
+var
+  Result: TDataItem;
+begin
+  Result := TBISQL.From(MyData, 'select Country, Sum(Sales) from Data group by Country');
+  // Result contains aggregated data
+end;
+```
+
+### ProviderFrom
+
+Parses SQL syntax and returns the provider object without executing.
+
+<ParamField path="AData" type="TDataItem" required>
+  Source data item for context
+</ParamField>
+
+<ParamField path="SQL" type="String" required>
+  SQL query string to parse
+</ParamField>
+
+<ParamField path="GetData" type="TGetDataProc">
+  Optional callback to resolve data names
+</ParamField>
+
+<ParamField path="ErrorProc" type="TBIErrorProc">
+  Optional error handling callback
+</ParamField>
+
+**Returns:** TDataProvider (TDataSelect or TSummary)
+
+```pascal
+var
+  Provider: TDataProvider;
+begin
+  Provider := TBISQL.ProviderFrom(MyData, 'select * from Customers where Country="USA"');
+  // Provider is a TDataSelect object
+end;
+```
+
+## Supported SQL Syntax
+
+TBISQL supports a subset of standard SQL:
+
+### SELECT Queries
+
+```sql
+select [distinct] <columns> 
+from <table>
+[where <condition>]
+[order by <columns> [asc|desc]]
+[limit <number>]
+[offset <number>]
+```
+
+### GROUP BY Queries (Summaries)
+
+```sql
+select <dimensions>, <aggregates>
+from <table>
+[where <condition>]
+group by <dimensions>
+```
+
+### Aggregate Functions
+
+- `Count(field)`
+- `Sum(field)`
+- `Average(field)` or `Avg(field)`
+- `Minimum(field)` or `Min(field)`
+- `Maximum(field)` or `Max(field)`
+- `First(field)`
+- `Last(field)`
+
+### Date/Time Parts
+
+```sql
+select Year(OrderDate), Sum(Amount)
+from Orders
+group by Year(OrderDate)
+```
+
+Supported parts: Year, Month, Quarter, Day, Hour, Minute, Second, WeekDay, DayOfYear, etc.
+
+## Examples
+
+### Simple SELECT
+
+```pascal
+var
+  Result: TDataItem;
+begin
+  Result := TBISQL.From(Customers, 'select Name, City from Customers');
+end;
+```
+
+### SELECT with WHERE
+
+```pascal
+Result := TBISQL.From(Orders, 
+  'select OrderID, Amount from Orders where Amount > 1000');
+```
+
+### SELECT with DISTINCT
+
+```pascal
+Result := TBISQL.From(Products, 
+  'select distinct Category from Products');
+```
+
+### Aggregation
+
+```pascal
+Result := TBISQL.From(Sales, 
+  'select Country, Sum(Revenue) from Sales group by Country');
+```
+
+### Multiple Grouping
+
+```pascal
+Result := TBISQL.From(Sales,
+  'select Year(Date), Country, Sum(Revenue) ' +
+  'from Sales ' +
+  'group by Year(Date), Country');
+```
+
+### Sorting
+
+```pascal
+Result := TBISQL.From(Products,
+  'select Name, Price from Products order by Price desc');
+```
+
+### Pagination
+
+```pascal
+Result := TBISQL.From(Customers,
+  'select * from Customers limit 10 offset 20');
+```
+
+### Converting Objects to SQL
+
+```pascal
+var
+  Select: TDataSelect;
+  SQL: String;
+begin
+  Select := TDataSelect.Create(nil);
+  Select.Add(Data['Name']);
+  Select.Add(Data['Price']);
+  Select.Filter := TDataFilter.FromString(Data, 'Price > 100');
+  
+  SQL := TBISQL.From(Select);
+  // Result: "select Name, Price from Data where Price > 100"
+end;
+```
+
+## Error Handling
+
+Provide a custom error handler to gracefully handle parse errors:
+
+```pascal
+function MyErrorHandler(const Sender: TObject; const Error: String): Boolean;
+begin
+  ShowMessage('SQL Error: ' + Error);
+  Result := True; // Return True to suppress exception
+end;
+
+var
+  Result: TDataItem;
+begin
+  Result := TBISQL.From(MyData, 'select invalid syntax', nil, MyErrorHandler);
+end;
+```
+
+## See Also
+
+- [TBIQuery](/api/tbiquery) - High-level query component
+- [TSummary](/api/tsummary) - Aggregation and grouping
+- [TDataSelect](/api/tdataselect) - Data selection and filtering
+- [TExpression](/api/texpression) - Expression engine

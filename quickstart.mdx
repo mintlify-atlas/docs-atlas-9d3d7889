@@ -1,80 +1,318 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Get started with TeeBI in minutes - import data, query it, and visualize the results"
 ---
 
-## Get started in three steps
+## Your first TeeBI application
 
-Get your documentation site running locally and make your first customization.
+This quickstart guide walks you through creating a simple TeeBI application that imports data from a CSV file, queries it, and displays results in a grid and chart.
 
-### Step 1: Set up your local environment
+## What you'll build
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+You'll create an application that:
+- Imports data from a CSV file
+- Performs SQL-like queries on the data
+- Displays results in a grid component
+- Visualizes data with charts
 
-### Step 2: Deploy your changes
+<Steps>
+  <Step title="Set up your project">
+    Create a new VCL or FireMonkey application in RAD Studio or Lazarus.
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    Add the TeeBI core units to your uses clause:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    ```pascal
+    uses
+      BI.DataItem,
+      BI.CSV,
+      BI.SQL,
+      VCLBI.Grid,
+      VCLBI.Chart;
+    ```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    <Note>
+    For FireMonkey applications, use `FMXBI.Grid` and `FMXBI.Chart` instead of the VCL equivalents.
+    </Note>
+  </Step>
 
-### Step 3: Go live
+  <Step title="Import data from CSV">
+    TeeBI makes importing data extremely simple. Load a CSV file with a single line of code:
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    ```pascal
+    var
+      Data1: TDataItem;
+    begin
+      // Import data from CSV file
+      Data1 := TBICSV.FromFile('mydata.csv');
+    end;
+    ```
+
+    You can also import from strings or TStrings:
+
+    ```pascal
+    // From a string
+    Data1 := TBICSV.From('Name,Age,Country' + #13#10 + 'John,25,USA');
+
+    // From a memo component
+    Data1 := TBICSV.From(Memo1.Lines);
+    ```
+
+    <Accordion title="Other import methods">
+      TeeBI supports importing from multiple sources:
+
+      ```pascal
+      // From database - loads all tables in one line
+      Data1 := TBIDB.From(SQLConnection1);
+
+      // From JSON
+      Data1 := TBIJson.From(JsonString);
+
+      // From XML
+      Data1 := TBIXML.From(XmlString);
+
+      // From arrays or custom records (via RTTI)
+      Data1 := TTypeProvider<TCustomer>.Create(Self, MyArrayOfCustomers).Data;
+
+      // From components with automatic detection
+      Data1 := TComponentImporter.From(Self, DataSource1);
+
+      // From any URL with automatic format detection
+      Data1 := TBIURLSource.From('https://www.mysite.com/get/mydata?param=123');
+
+      // From AI agents like Google Gemini
+      Data1 := TBIAI.From('Give me the list of the highest 10 mountains by elevation in csv format');
+      ```
+    </Accordion>
+  </Step>
+
+  <Step title="Query your data">
+    Use SQL-like syntax to query and transform your data:
+
+    ```pascal
+    var
+      QueryResult: TDataItem;
+    begin
+      // Group by and aggregate
+      QueryResult := TBISQL.From(Data1, 
+        'sum(Amount) where (Customer=123) and (Product<456) group by Country, Year');
+
+      // Sub-select query
+      QueryResult := TBISQL.From(Data1,
+        'ProductName, UnitPrice where UnitPrice > select Average(UnitPrice)');
+
+      // Top N with offset (pagination)
+      QueryResult := TBISQL.From(Movies,
+        'top 100 offset 15000 year, length');
+    end;
+    ```
+
+    TeeBI queries support:
+    - `WHERE` clauses with complex conditions
+    - `GROUP BY` with multiple fields
+    - Aggregate functions: `SUM`, `COUNT`, `AVG`, `MIN`, `MAX`
+    - `HAVING` clauses
+    - Sub-select queries
+    - `DISTINCT` values
+    - `TOP N` and `OFFSET` for pagination
+    - Date/time operators
+    - Expression evaluation
+
+    <Tip>
+    TeeBI queries execute entirely in memory, making them extremely fast even on large datasets.
+    </Tip>
+  </Step>
+
+  <Step title="Visualize with grids and charts">
+    Display your data using TeeBI's built-in visualization components:
+
+    **Using TBIGrid:**
+
+    ```pascal
+    // Display data in a grid
+    BIGrid1.Data := Data1;
+
+    // Display a sub-table
+    BIGrid2.Data := Data1['Products'];
+    ```
+
+    **Using TBIChart:**
+
+    ```pascal
+    // Display data in a chart
+    BIChart1.Data := Data1;
+
+    // TeeBI automatically selects appropriate chart types
+    // based on your data structure
+    ```
+
+    <Info>
+    TeeBI components automatically visualize complex data structures. The library intelligently chooses appropriate chart types and grid layouts based on your data.
+    </Info>
+  </Step>
+
+  <Step title="Complete example">
+    Here's a complete working example that combines all the steps:
+
+    ```pascal
+    procedure TForm1.Button1Click(Sender: TObject);
+    var
+      RawData: TDataItem;
+      Summary: TDataItem;
+    begin
+      // Step 1: Import data from CSV
+      RawData := TBICSV.FromFile('sales.csv');
+
+      // Step 2: Query the data - get sales summary by country
+      Summary := TBISQL.From(RawData,
+        'sum(Amount) as TotalSales, Country group by Country');
+
+      // Step 3: Display in grid
+      BIGrid1.Data := Summary;
+
+      // Step 4: Visualize in chart
+      BIChart1.Data := Summary;
+    end;
+    ```
+
+    This example:
+    1. Loads sales data from a CSV file
+    2. Creates a summary query that totals sales by country
+    3. Displays the results in a grid
+    4. Visualizes the data in a chart
+
+    All with just a few lines of code!
+  </Step>
+</Steps>
+
+## Working with sub-tables
+
+TeeBI automatically handles relationships between data:
+
+```pascal
+var
+  Orders: TDataItem;
+  OrderDetails: TDataItem;
+begin
+  // Import complete database
+  Orders := TBIDB.From(SQLConnection1);
+
+  // Access sub-table using array notation
+  OrderDetails := Orders['Order Details'];
+
+  // Display sub-table in a grid
+  BIGrid1.Data := OrderDetails;
+end;
+```
+
+TeeBI creates automatic relationships between columns (master-detail), indexes, and foreign keys.
+
+## Exporting data
+
+Export your processed data to various formats:
+
+```pascal
+// Export to CSV
+TBICSVExport.Save(Data1, 'output.csv');
+
+// Export to JSON
+TBIJsonExport.Save(Data1, 'output.json');
+
+// Export to XML
+TBIXMLExport.Save(Data1, 'output.xml');
+
+// Export to Excel, PDF, HTML also supported
+```
+
+## Performance tips
+
+<Tip>
+TeeBI is designed for speed. Here are some tips to maximize performance:
+
+- Every column is a simple array - avoid unnecessary copying
+- Queries execute in memory without database overhead
+- Use `TDataItem.Capacity` to pre-allocate memory for large imports
+- Enable multi-threading for parallel operations when supported
+- Take advantage of indexed searches for faster lookups
+</Tip>
+
+## Common patterns
+
+### Pattern: Import, transform, export
+
+```pascal
+var
+  RawData, Cleaned: TDataItem;
+begin
+  // Import from source
+  RawData := TBICSV.FromFile('input.csv');
+
+  // Transform with query
+  Cleaned := TBISQL.From(RawData,
+    'distinct Name, Email where Email is not null');
+
+  // Export to new format
+  TBIJsonExport.Save(Cleaned, 'output.json');
+end;
+```
+
+### Pattern: Multi-source data integration
+
+```pascal
+var
+  FromDB, FromCSV, Combined: TDataItem;
+begin
+  // Load from different sources
+  FromDB := TBIDB.From(SQLConnection1);
+  FromCSV := TBICSV.FromFile('additional.csv');
+
+  // Combine and analyze
+  Combined := TBISQL.From(FromDB,
+    'Customer, sum(Orders) group by Customer');
+end;
+```
+
+### Pattern: Interactive dashboard
+
+```pascal
+procedure TForm1.ComboBox1Change(Sender: TObject);
+var
+  Filtered: TDataItem;
+  SelectedCountry: string;
+begin
+  SelectedCountry := ComboBox1.Text;
+
+  // Filter data based on user selection
+  Filtered := TBISQL.From(OriginalData,
+    'Product, sum(Sales) where Country="' + SelectedCountry + 
+    '" group by Product');
+
+  // Update visualizations
+  BIGrid1.Data := Filtered;
+  BIChart1.Data := Filtered;
+end;
+```
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
+Now that you've created your first TeeBI application, explore these topics:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Core concepts" icon="book" href="/core-concepts">
+    Deep dive into TDataItem and TeeBI architecture
+  </Card>
+  <Card title="Importing data" icon="file-import" href="/importing">
+    Learn all the ways to import data into TeeBI
+  </Card>
+  <Card title="Querying data" icon="magnifying-glass" href="/querying">
+    Master SQL-like queries and data transformations
+  </Card>
+  <Card title="Visualization" icon="chart-bar" href="/visualization">
+    Create stunning charts and grids from your data
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Need help?
+
+- Join the [Telegram forums](https://t.me/steema_bi) for community support
+- Check the [API Reference](https://steema.com/docs/TeeBIVCLReference.htm) for detailed documentation
+- Explore [example projects](https://github.com/Steema/BI/tree/master/demos) on GitHub

@@ -1,0 +1,114 @@
+---
+title: Pivot Tables Overview
+description: Multi-dimensional Excel-like pivot tables for data analysis
+---
+
+TeeBI provides powerful pivot table capabilities through the `TSummary` class, enabling multi-dimensional data analysis similar to Excel pivot tables.
+
+## What are Pivot Tables?
+
+Pivot tables transform flat data into multi-dimensional summaries by:
+
+- **Grouping data** by one or more dimensions (rows and columns)
+- **Aggregating values** using measures (sum, count, average, etc.)
+- **Calculating percentages** of totals, subtotals, or running values
+- **Filtering** rows and columns based on conditions
+
+See `BI.Summary.pas:402` for the main `TSummary` class.
+
+## Key Features
+
+### Automatic Layouts
+
+TeeBI automatically determines optimal row/column orientation:
+
+```pascal
+var
+  Summary: TSummary;
+  Result: TDataItem;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    // Add dimensions and measures
+    Summary.AddGroupBy(Data['Country']);
+    Summary.AddMeasure(Data['Sales'], TAggregate.Sum);
+    
+    // Calculate pivot table
+    Result := Summary.Calculate;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+### Drag & Drop Editor
+
+The pivot editor allows visual configuration:
+
+- Drag fields to rows, columns, or values areas
+- Reorder dimensions dynamically
+- Apply filters and aggregations
+- Configure calculations (percentages, running totals)
+
+See `BI.Summary.pas:402-470` for available properties.
+
+## Basic Components
+
+| Component | Description | Location |
+|-----------|-------------|----------|
+| **GroupBy** | Dimensions for rows/columns | `BI.Summary.pas:274` |
+| **Measures** | Aggregated values | `BI.Summary.pas:194` |
+| **Filter** | Row-level filtering | `BI.Summary.pas:466` |
+| **Having** | Summary-level filtering | `BI.Summary.pas:467` |
+
+## Aggregation Types
+
+Available through `TAggregate` enum (`BI.Summary.pas:106`):
+
+- **Count** - Number of records
+- **Sum** - Total of values
+- **Average** - Mean value
+- **Minimum** - Smallest value
+- **Maximum** - Largest value
+- **First** - First value
+- **Last** - Last value
+
+## Example: Sales by Region
+
+```pascal
+var
+  Summary: TSummary;
+  SalesData: TDataItem;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    // Group by Region (rows)
+    Summary.AddGroupBy(SalesData['Region']);
+    
+    // Group by Quarter (columns)
+    Summary.AddGroupBy(SalesData['Quarter']);
+    
+    // Sum of Sales
+    Summary.AddMeasure(SalesData['Amount'], TAggregate.Sum);
+    
+    // Calculate and display
+    Result := Summary.Calculate;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Dimensions" icon="table-columns" href="/pivot/dimensions">
+    Learn about GroupBy dimensions and layouts
+  </Card>
+  <Card title="Measures" icon="calculator" href="/pivot/measures">
+    Configure aggregations and calculations
+  </Card>
+  <Card title="Editor" icon="sliders" href="/pivot/editor">
+    Use the visual pivot table editor
+  </Card>
+</CardGroup>

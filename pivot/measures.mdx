@@ -1,0 +1,231 @@
+---
+title: Pivot Measures
+description: Aggregate and calculate values in pivot tables
+---
+
+Measures define the aggregated values displayed in pivot table cells.
+
+## Adding Measures
+
+Use `AddMeasure` with an aggregation type:
+
+```pascal
+var
+  Summary: TSummary;
+  Measure: TMeasure;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    // Add measure with aggregation
+    Measure := Summary.AddMeasure(
+      Data['Sales'], 
+      TAggregate.Sum
+    );
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+See `BI.Summary.pas:449-450` for `AddMeasure` methods.
+
+## Aggregation Types
+
+The `TAggregate` enum (`BI.Summary.pas:106`) provides:
+
+```pascal
+type
+  TAggregate = (Count, Sum, Average, Minimum, Maximum, First, Last);
+```
+
+### Count
+
+```pascal
+Measure := Summary.AddMeasure(Data['OrderID'], TAggregate.Count);
+```
+
+### Sum
+
+```pascal
+Measure := Summary.AddMeasure(Data['Amount'], TAggregate.Sum);
+```
+
+### Average
+
+```pascal
+Measure := Summary.AddMeasure(Data['Price'], TAggregate.Average);
+```
+
+### Min/Max
+
+```pascal
+Measure := Summary.AddMeasure(Data['Temperature'], TAggregate.Maximum);
+Measure := Summary.AddMeasure(Data['Temperature'], TAggregate.Minimum);
+```
+
+### First/Last
+
+```pascal
+Measure := Summary.AddMeasure(Data['Status'], TAggregate.First);
+Measure := Summary.AddMeasure(Data['Status'], TAggregate.Last);
+```
+
+## Percentage Calculations
+
+Calculate percentages of totals using `TCalculationPercentage` (`BI.Summary.pas:174`):
+
+```pascal
+type
+  TCalculationPercentage = (None, Column, Row, Total);
+```
+
+```pascal
+var
+  Measure: TMeasure;
+begin
+  Measure := Summary.AddMeasure(Data['Sales'], TAggregate.Sum);
+  
+  // Calculate as percentage of grand total
+  Measure.Calculation.Percentage := TCalculationPercentage.Total;
+  
+  // Or percentage of column total
+  Measure.Calculation.Percentage := TCalculationPercentage.Column;
+  
+  // Or percentage of row total
+  Measure.Calculation.Percentage := TCalculationPercentage.Row;
+end;
+```
+
+See `BI.Summary.pas:176-191` for `TMeasureCalculation`.
+
+## Running Calculations
+
+Cumulative sums and differences using `TCalculationRunning` (`BI.Summary.pas:171`):
+
+```pascal
+type
+  TCalculationRunning = (No, Cumulative, Difference);
+```
+
+### Cumulative Sum
+
+```pascal
+Measure.Calculation.Running := TCalculationRunning.Cumulative;
+Measure.Calculation.RunningByRows := True;  // By rows or columns
+```
+
+### Difference from Previous
+
+```pascal
+Measure.Calculation.Running := TCalculationRunning.Difference;
+```
+
+## Missing Values
+
+Handle null/missing values using `TMeasureMissing` (`BI.Summary.pas:120-128`):
+
+```pascal
+// Treat missing values as zero
+Measure.Missing.AsZero := True;
+```
+
+<Note>
+  Not all aggregations support AsZero:
+  - **Supported**: Sum, Average, Count
+  - **Not supported**: Min, Max, First, Last
+</Note>
+
+## Expression Measures
+
+Create measures from expressions:
+
+```pascal
+var
+  Expr: TExpression;
+begin
+  // Calculate profit
+  Expr := Data['Revenue'] - Data['Cost'];
+  Measure := Summary.AddMeasure(Expr, TAggregate.Sum);
+end;
+```
+
+## Multiple Measures
+
+Add multiple measures to the same pivot:
+
+```pascal
+begin
+  // Total sales
+  Summary.AddMeasure(Data['Amount'], TAggregate.Sum);
+  
+  // Average order value
+  Summary.AddMeasure(Data['Amount'], TAggregate.Average);
+  
+  // Order count
+  Summary.AddMeasure(Data['OrderID'], TAggregate.Count);
+end;
+```
+
+## Custom Names
+
+```pascal
+Measure := Summary.AddMeasure(Data['Sales'], TAggregate.Sum);
+Measure.Name := 'Total Revenue';
+```
+
+## Active Property
+
+Enable/disable measures dynamically:
+
+```pascal
+Measure.Active := False;  // Temporarily disable
+```
+
+See `BI.Summary.pas:194-235` for the complete `TMeasure` class.
+
+## Complete Example
+
+```pascal
+var
+  Summary: TSummary;
+  Measure: TMeasure;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    // Dimensions
+    Summary.AddGroupBy(Data['Region']);
+    Summary.AddGroupBy(Data['Quarter']);
+    
+    // Sales total
+    Measure := Summary.AddMeasure(Data['Sales'], TAggregate.Sum);
+    Measure.Name := 'Total Sales';
+    
+    // Sales percentage of total
+    Measure := Summary.AddMeasure(Data['Sales'], TAggregate.Sum);
+    Measure.Name := '% of Total';
+    Measure.Calculation.Percentage := TCalculationPercentage.Total;
+    
+    // Running total
+    Measure := Summary.AddMeasure(Data['Sales'], TAggregate.Sum);
+    Measure.Name := 'YTD Sales';
+    Measure.Calculation.Running := TCalculationRunning.Cumulative;
+    Measure.Calculation.RunningByRows := True;
+    
+    // Calculate
+    Result := Summary.Calculate;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Dimensions" icon="table-columns" href="/pivot/dimensions">
+    Configure row and column groupings
+  </Card>
+  <Card title="Editor" icon="sliders" href="/pivot/editor">
+    Visual measure configuration
+  </Card>
+</CardGroup>

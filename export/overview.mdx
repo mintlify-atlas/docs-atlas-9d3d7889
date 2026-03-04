@@ -1,0 +1,324 @@
+---
+title: Data Export Overview
+description: Export data to multiple formats including CSV, PDF, HTML, XML, Excel, and JSON
+---
+
+TeeBI provides comprehensive data export capabilities through the `BI.Persist.pas` unit.
+
+## Supported Formats
+
+Export data to multiple formats:
+
+- **CSV** - Comma-separated values
+- **PDF** - Portable Document Format
+- **HTML** - Web pages and tables
+- **XML** - Extensible Markup Language
+- **Excel** - Microsoft Excel workbooks
+- **JSON** - JavaScript Object Notation
+- **Binary** - TeeBI native format (.bi, .databi)
+
+See `BI.Persist.pas` for persistence functionality.
+
+## Binary Format
+
+TeeBI's native format for optimal performance.
+
+### Structure and Data Together
+
+Use `TDataItemPersistence` for complete data packages (`BI.Persist.pas:394-404`):
+
+```pascal
+uses
+  BI.Persist, BI.DataItem;
+
+var
+  Data: TDataItem;
+begin
+  // Save both structure and data
+  TDataItemPersistence.Save(Data, 'data.bidata');
+  
+  // Load everything
+  Data := TDataItemPersistence.Load('data.bidata');
+end;
+```
+
+File extension: `.bidata`
+
+### Structure Only
+
+Use `TPersistence` for metadata only (`BI.Persist.pas:331-360`):
+
+```pascal
+var
+  Data: TDataItem;
+begin
+  // Save structure (no data values)
+  TPersistence.Save(Data, 'structure.bi');
+  
+  // Load structure
+  Data := TPersistence.Load('structure.bi');
+end;
+```
+
+File extension: `.bi`
+
+See `BI.Persist.pas:342` for the version constant.
+
+### Data Only
+
+Use `TDataPersistence` for values only (`BI.Persist.pas:363-391`):
+
+```pascal
+var
+  Data: TDataItem;
+begin
+  // Requires structure to be already loaded
+  TDataPersistence.Save(Data, 'values.databi');
+  
+  // Load values into existing structure
+  TDataPersistence.Load('values.databi', Data, True);
+end;
+```
+
+File extension: `.databi`
+
+See `BI.Persist.pas:372` for the version constant.
+
+## Delayed Loading
+
+Load data on-demand for large files:
+
+```pascal
+var
+  Data: TDataItem;
+begin
+  // Load structure only, defer data loading
+  Data := TDataItemPersistence.Load('largefile.bidata');
+  
+  // Data loads automatically when accessed
+  ShowMessage(Data.TextData[0]);
+end;
+```
+
+See `BI.Persist.pas:1468-1513` for delayed loading implementation.
+
+## Stream-Based Export
+
+Export to streams instead of files:
+
+```pascal
+var
+  Stream: TMemoryStream;
+  Data: TDataItem;
+begin
+  Stream := TMemoryStream.Create;
+  try
+    // Save to stream
+    TDataItemPersistence.Save(Data, Stream);
+    
+    // Use stream (send over network, etc.)
+    SendData(Stream);
+  finally
+    Stream.Free;
+  end;
+end;
+```
+
+See `BI.Persist.pas:402` for stream save methods.
+
+## Compression
+
+Automatically compress data:
+
+```pascal
+var
+  Stream, ZipStream: TStream;
+begin
+  Stream := TStore.DataToStream(Data, False);  // Uncompressed
+  ZipStream := TStore.DataToStream(Data, True); // Compressed
+  
+  // Or manually
+  ZipStream := TStore.ZipStream(Stream);
+end;
+```
+
+See `BI.Persist.pas:276-279` for `DataToStream` methods.
+
+## Store System
+
+Manage data repositories using `TStore` (`BI.Persist.pas:251-307`):
+
+### Save to Store
+
+```pascal
+var
+  Data: TDataItem;
+begin
+  // Save to default store
+  TStore.Save(Data, 'MyData');
+  
+  // Save to specific store
+  TStore.Save(Data, 'C:\DataStore\MyData');
+end;
+```
+
+See `BI.Persist.pas:295-297` for `Save` methods.
+
+### Load from Store
+
+```pascal
+var
+  Data: TDataItem;
+begin
+  // Load from default store
+  Data := TStore.Load('MyData');
+  
+  // Load from specific store
+  Data := TStore.Load('C:\DataStore', 'MyData');
+end;
+```
+
+See `BI.Persist.pas:274-275` for `Load` methods.
+
+### Default Store
+
+```pascal
+begin
+  // Set default location
+  TStore.DefaultName := 'C:\MyDataStore';
+  
+  // Now Load/Save without path
+  TStore.Save(Data, 'MyData');
+  Data := TStore.Load('MyData');
+end;
+```
+
+See `BI.Persist.pas:254-259` for default store property.
+
+## Folder Storage
+
+Store each column as separate file:
+
+```pascal
+var
+  Data: TDataItem;
+begin
+  // Save to folder (one file per column)
+  TDataPersistence.SaveToFolder(Data, 'C:\DataFolder\');
+  
+  // Load from folder
+  TDataPersistence.LoadFromFolder('C:\DataFolder\', Data, True);
+end;
+```
+
+See `BI.Persist.pas:1780-1827` for folder persistence.
+
+## Progress Callback
+
+Monitor save/load progress:
+
+```pascal
+procedure ShowProgress(const Sender: TObject; 
+                       const Percent: Single; 
+                       var Cancel: Boolean);
+begin
+  ProgressBar.Position := Round(Percent);
+  Application.ProcessMessages;
+  
+  if UserClickedCancel then
+    Cancel := True;
+end;
+
+begin
+  // Save with progress
+  TDataPersistence.Save(Data, 'data.databi', ShowProgress);
+end;
+```
+
+See `BI.Persist.pas:46` for `TBIProgress` type.
+
+## Data Definition
+
+Define data sources using `TDataDefinition` (`BI.Persist.pas:116-217`):
+
+```pascal
+var
+  Definition: TDataDefinition;
+begin
+  Definition := TDataDefinition.Create(nil);
+  try
+    Definition.Kind := TDataDefinitionKind.Files;
+    Definition.FileName := 'data.csv';
+    Definition['Delimiter'] := ',';
+    Definition['HasHeader'] := 'True';
+    
+    // Import data
+    Data := Definition.Import('');
+  finally
+    Definition.Free;
+  end;
+end;
+```
+
+See `BI.Persist.pas:112` for `TDataDefinitionKind`.
+
+## Registry/INI Settings
+
+Cross-platform configuration using `TBIRegistry` (`BI.Persist.pas:407-426`):
+
+```pascal
+begin
+  // Read settings
+  Path := TBIRegistry.ReadString('Settings', 'DataPath', 'C:\Data');
+  Count := TBIRegistry.ReadInteger('Settings', 'MaxRows', 1000);
+  AutoLoad := TBIRegistry.ReadBoolean('Settings', 'AutoLoad', True);
+  
+  // Write settings
+  TBIRegistry.WriteString('Settings', 'DataPath', 'D:\Data');
+  TBIRegistry.WriteInteger('Settings', 'MaxRows', 5000);
+  TBIRegistry.WriteBoolean('Settings', 'AutoLoad', False);
+end;
+```
+
+See `BI.Persist.pas:410-424` for registry methods.
+
+## Error Handling
+
+```pascal
+var
+  Data: TDataItem;
+begin
+  try
+    Data := TDataItemPersistence.Load('data.bidata');
+  except
+    on E: EBILoadVersionException do
+      ShowMessage('Incompatible version: ' + 
+                  IntToStr(E.WrongVersion));
+    on E: EBIException do
+      ShowMessage('Load error: ' + E.Message);
+  end;
+end;
+```
+
+See `BI.Persist.pas:428-433` for `EBILoadVersionException`.
+
+## Performance Tips
+
+<Tip>
+  - Use `.bidata` format for fastest save/load
+  - Enable compression for network transfer
+  - Use delayed loading for large datasets
+  - Folder storage works well for very wide tables
+  - Calculate statistics before saving for faster queries
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Formats" icon="file" href="/export/formats">
+    Learn about export formats
+  </Card>
+  <Card title="Customization" icon="sliders" href="/export/customization">
+    Customize export settings
+  </Card>
+</CardGroup>

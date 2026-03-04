@@ -1,0 +1,358 @@
+---
+title: Data Types
+description: Understanding TDataKind enumeration and type handling in TeeBI
+---
+
+## Overview
+
+TeeBI uses the `TDataKind` enumeration to define the data type of each TDataItem. This type system is optimized for performance and memory efficiency, with each kind mapping to a specific Pascal array type.
+
+## TDataKind Enumeration
+
+The complete list of supported data types:
+
+```pascal
+TDataKind = (
+  dkInt32,      // 32-bit signed integer
+  dkInt64,      // 64-bit signed integer
+  dkSingle,     // 32-bit floating point
+  dkDouble,     // 64-bit floating point
+  dkExtended,   // 80-bit extended precision (x86 only)
+  dkText,       // String
+  dkDateTime,   // TDateTime
+  dkBoolean,    // Boolean
+  dkUnknown     // Uninitialized or unknown type
+);
+```
+
+## Numeric Types
+
+### Integer Types
+
+<CodeGroup>
+```pascal dkInt32
+var
+  Item: TDataItem;
+begin
+  Item := TDataItem.Create(dkInt32, 'Quantity');
+  Item.Resize(3);
+  
+  Item.Int32Data[0] := 100;
+  Item.Int32Data[1] := -50;
+  Item.Int32Data[2] := 2147483647; // Max Int32
+end;
+```
+
+```pascal dkInt64
+var
+  Item: TDataItem;
+begin
+  Item := TDataItem.Create(dkInt64, 'Population');
+  Item.Resize(2);
+  
+  Item.Int64Data[0] := 7800000000;  // World population
+  Item.Int64Data[1] := 9223372036854775807; // Max Int64
+end;
+```
+</CodeGroup>
+
+**Use cases:**
+- `dkInt32`: Counters, IDs, ages, quantities (range: -2,147,483,648 to 2,147,483,647)
+- `dkInt64`: Large numbers, timestamps, financial cents (range: -9.2 quintillion to 9.2 quintillion)
+
+### Floating Point Types
+
+<CodeGroup>
+```pascal dkSingle
+var
+  Item: TDataItem;
+begin
+  Item := TDataItem.Create(dkSingle, 'Temperature');
+  Item.Resize(3);
+  
+  Item.SingleData[0] := 23.5;
+  Item.SingleData[1] := -10.25;
+  Item.SingleData[2] := 98.6;
+end;
+```
+
+```pascal dkDouble
+var
+  Item: TDataItem;
+begin
+  Item := TDataItem.Create(dkDouble, 'Price');
+  Item.Resize(2);
+  
+  Item.DoubleData[0] := 1299.99;
+  Item.DoubleData[1] := 0.0000001; // High precision
+end;
+```
+
+```pascal dkExtended
+var
+  Item: TDataItem;
+begin
+  Item := TDataItem.Create(dkExtended, 'ScientificValue');
+  Item.Resize(1);
+  
+  // Extended precision (x86 only)
+  Item.ExtendedData[0] := 3.141592653589793238;
+end;
+```
+</CodeGroup>
+
+**Use cases:**
+- `dkSingle`: 4 bytes, ~7 decimal digits precision, measurements, temperatures
+- `dkDouble`: 8 bytes, ~15 decimal digits precision, prices, scientific calculations (most common)
+- `dkExtended`: 10 bytes (x86) or 8 bytes (x64), maximum precision when needed
+
+<Note>
+On x64 platforms, `dkExtended` is mapped to `dkDouble` due to CPU architecture limitations.
+</Note>
+
+## Text Type
+
+The `dkText` type stores string data:
+
+```pascal
+var
+  Item: TDataItem;
+begin
+  Item := TDataItem.Create(dkText, 'CustomerName');
+  Item.Resize(3);
+  
+  Item.TextData[0] := 'John Smith';
+  Item.TextData[1] := 'María García';
+  Item.TextData[2] := '李明'; // Unicode support
+  
+  // Access values
+  ShowMessage(Item.TextData[0]);
+end;
+```
+
+**Features:**
+- Full Unicode support
+- Variable length strings
+- No fixed size limits
+- Case-sensitive and case-insensitive operations available
+
+## DateTime Type
+
+The `dkDateTime` type uses Delphi's TDateTime format:
+
+```pascal
+var
+  Item: TDataItem;
+begin
+  Item := TDataItem.Create(dkDateTime, 'OrderDate');
+  Item.Resize(3);
+  
+  Item.DateTimeData[0] := Now;
+  Item.DateTimeData[1] := EncodeDate(2024, 1, 15);
+  Item.DateTimeData[2] := EncodeDateTime(2024, 3, 4, 14, 30, 0, 0);
+  
+  // Convert to string
+  ShowMessage(DateTimeToStr(Item.DateTimeData[0]));
+end;
+```
+
+**Characteristics:**
+- Stores both date and time
+- Floating-point representation (integer part = days, fractional part = time)
+- Range: January 1, 0001 to December 31, 9999
+
+## Boolean Type
+
+The `dkBoolean` type stores true/false values:
+
+```pascal
+var
+  Item: TDataItem;
+begin
+  Item := TDataItem.Create(dkBoolean, 'IsActive');
+  Item.Resize(3);
+  
+  Item.BooleanData[0] := True;
+  Item.BooleanData[1] := False;
+  Item.BooleanData[2] := True;
+  
+  // Convert to string
+  ShowMessage(BoolToStr(Item.BooleanData[0], True));
+end;
+```
+
+## Type Detection
+
+### IsNumeric Helper
+
+The `TDataKind` type includes a helper method to check if a type is numeric:
+
+```pascal
+var
+  Kind: TDataKind;
+begin
+  Kind := dkDouble;
+  
+  if Kind.IsNumeric then
+    ShowMessage('This is a numeric type');
+  // Returns True for: dkInt32, dkInt64, dkSingle, dkDouble, dkExtended
+end;
+```
+
+### Type Conversion
+
+Convert between data kinds using the helper methods:
+
+```pascal
+var
+  Kind: TDataKind;
+  KindStr: String;
+begin
+  // Convert to string
+  Kind := dkDouble;
+  KindStr := Kind.ToString; // Returns 'Double'
+  
+  // Parse from string
+  if TDataKind.FromString('Int32', Kind) then
+    ShowMessage('Parsed: ' + Kind.ToString);
+end;
+```
+
+## Data Type Mapping
+
+| TDataKind | Pascal Type | Array Type | Size (bytes) |
+|-----------|-------------|------------|-------------|
+| dkInt32 | Integer | TInt32Array | 4 |
+| dkInt64 | Int64 | TInt64Array | 8 |
+| dkSingle | Single | TSingleArray | 4 |
+| dkDouble | Double | TDoubleArray | 8 |
+| dkExtended | Extended | TExtendedArray | 10 (x86) / 8 (x64) |
+| dkText | String | TTextArray | Variable |
+| dkDateTime | TDateTime | TDateTimeArray | 8 |
+| dkBoolean | Boolean | TBooleanArray | 1 |
+
+## Converting Values to Strings
+
+Use `DataToString` to convert any value to a string representation:
+
+```pascal
+var
+  Item: TDataItem;
+  Str: String;
+begin
+  Item := TDataItem.Create(dkDouble, 'Price');
+  Item.Resize(1);
+  Item.DoubleData[0] := 99.95;
+  
+  Str := Item.DataToString(0); // Returns '99.95'
+end;
+```
+
+This method handles:
+- Missing values (returns empty string)
+- Type-specific formatting
+- DateTime conversion
+- Boolean to string conversion
+
+## Working with Different Types
+
+### Type-Safe Access
+
+```pascal
+var
+  Item: TDataItem;
+begin
+  Item := TDataItem.Create(dkInt32);
+  
+  case Item.Kind of
+    dkInt32:     Item.Int32Data[0] := 100;
+    dkInt64:     Item.Int64Data[0] := 100;
+    dkSingle:    Item.SingleData[0] := 100.0;
+    dkDouble:    Item.DoubleData[0] := 100.0;
+    dkExtended:  Item.ExtendedData[0] := 100.0;
+    dkText:      Item.TextData[0] := '100';
+    dkDateTime:  Item.DateTimeData[0] := Now;
+    dkBoolean:   Item.BooleanData[0] := True;
+  end;
+end;
+```
+
+### Numeric Operations
+
+```pascal
+function SumColumn(const Item: TDataItem): Double;
+var
+  I: Integer;
+begin
+  Result := 0;
+  
+  if not Item.Kind.IsNumeric then
+    Exit;
+  
+  for I := 0 to Item.Count - 1 do
+  begin
+    if Item.Missing[I] then
+      Continue;
+      
+    case Item.Kind of
+      dkInt32:    Result := Result + Item.Int32Data[I];
+      dkInt64:    Result := Result + Item.Int64Data[I];
+      dkSingle:   Result := Result + Item.SingleData[I];
+      dkDouble:   Result := Result + Item.DoubleData[I];
+      dkExtended: Result := Result + Item.ExtendedData[I];
+    end;
+  end;
+end;
+```
+
+## Type Selection Guidelines
+
+<Steps>
+  <Step title="Choose integer for whole numbers">
+    Use `dkInt32` for most integers, `dkInt64` only when needed for very large values.
+  </Step>
+  
+  <Step title="Choose double for decimal numbers">
+    `dkDouble` is the recommended floating-point type for most scenarios.
+  </Step>
+  
+  <Step title="Use single for memory-constrained scenarios">
+    Only choose `dkSingle` when processing millions of values and memory is critical.
+  </Step>
+  
+  <Step title="Avoid extended unless necessary">
+    `dkExtended` has limited x64 support and is rarely needed.
+  </Step>
+</Steps>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Type Consistency" icon="check">
+    Keep the same data type throughout a column. Don't mix different numeric types.
+  </Card>
+
+  <Card title="Memory Efficiency" icon="memory">
+    Choose the smallest type that fits your data range to optimize memory usage.
+  </Card>
+
+  <Card title="Precision Awareness" icon="calculator">
+    Be aware of floating-point precision limits when comparing values or performing calculations.
+  </Card>
+
+  <Card title="Unicode Support" icon="language">
+    Use `dkText` for all string data - it fully supports Unicode characters.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Data Items" icon="database" href="/core/data-items">
+    Learn about TDataItem structure and usage
+  </Card>
+  
+  <Card title="Arrays" icon="list" href="/core/arrays">
+    Explore array operations and performance
+  </Card>
+</CardGroup>

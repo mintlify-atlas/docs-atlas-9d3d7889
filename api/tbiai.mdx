@@ -1,0 +1,190 @@
+---
+title: TBIAI
+description: AI agent integration for data import
+---
+
+## Overview
+
+`TBIAI` enables importing data from AI agents like Google Gemini, ChatGPT, Microsoft Copilot, and X Grok. Ask questions in natural language and receive structured data.
+
+Location: `BI.AI.pas:52`
+
+## Supported AI Agents
+
+```pascal
+TAgent = (Gemini, Copilot, ChatGPT, Grok);
+```
+
+- **Gemini**: Google's AI (free API key)
+- **Copilot**: Microsoft AI
+- **ChatGPT**: OpenAI models
+- **Grok**: X (Twitter) AI
+
+## Getting API Keys
+
+### Google Gemini (Free)
+Get your API key at: https://aistudio.google.com/app/apikey
+
+### OpenAI ChatGPT
+Register at: https://platform.openai.com/
+
+### X Grok
+API access through X platform
+
+## Methods
+
+### From
+```pascal
+class function From(const Question: String; const Agent: TAgent; const Key: String): TDataItem;
+```
+
+Sends a question to an AI agent and returns the response as structured data.
+
+**Parameters:**
+- `Question`: Your query in natural language
+- `Agent`: Which AI service to use
+- `Key`: Your API key
+
+**Returns:** TDataItem with the AI's response
+
+## Usage Examples
+
+### Basic Query
+
+```pascal
+var
+  Data: TDataItem;
+begin
+  Data := TBIAI.From(
+    'Give me a list of the top 10 tallest mountains with their heights in meters',
+    TBIAI.TAgent.Gemini,
+    'YOUR_API_KEY_HERE'
+  );
+  
+  // Visualize the data
+  BIGrid1.Data := Data;
+  BIChart1.Data := Data;
+end;
+```
+
+### CSV Format Request
+
+```pascal
+var
+  Data: TDataItem;
+begin
+  Data := TBIAI.From(
+    'List of countries with population in CSV format, just the data',
+    TBIAI.TAgent.Gemini,
+    'YOUR_API_KEY_HERE'
+  );
+  
+  ShowMessage('Rows: ' + IntToStr(Data.Count));
+end;
+```
+
+### Using Different Agents
+
+```pascal
+// Google Gemini (recommended, free)
+Data := TBIAI.From(
+  'Top 5 programming languages',
+  TBIAI.TAgent.Gemini,
+  GeminiKey
+);
+
+// OpenAI ChatGPT
+Data := TBIAI.From(
+  'Sales data for 2024 by quarter',
+  TBIAI.TAgent.ChatGPT,
+  ChatGPTKey
+);
+
+// X Grok
+Data := TBIAI.From(
+  'Weather forecast for next week',
+  TBIAI.TAgent.Grok,
+  GrokKey
+);
+```
+
+## Best Practices
+
+### 1. Request Structured Data
+
+Be specific about the format:
+```pascal
+'Give me GDP data in CSV format'
+'Return JSON with name, age, city fields'
+'Table with columns: product, price, stock'
+```
+
+### 2. Keep API Keys Secure
+
+```pascal
+const
+  // DON'T hardcode keys in source
+  // MyKey = 'abc123...';  // WRONG!
+  
+var
+  Key: String;
+begin
+  // Load from config file or environment
+  Key := TSettings.LoadAPIKey;
+  Data := TBIAI.From(Question, TAgent.Gemini, Key);
+end;
+```
+
+### 3. Handle Empty Responses
+
+```pascal
+var
+  Data: TDataItem;
+begin
+  try
+    Data := TBIAI.From(Question, Agent, Key);
+    
+    if (Data = nil) or (Data.Count = 0) then
+      ShowMessage('No data returned')
+    else
+      ProcessData(Data);
+  except
+    on E: EBIAI do
+      ShowMessage('AI Error: ' + E.Message);
+  end;
+end;
+```
+
+## Tips for Better Results
+
+1. **Be Specific**: "Top 10 mountains by elevation" vs "mountains"
+2. **Request Format**: Ask for CSV, JSON, or table format
+3. **Limit Data**: "Top 10" or "last 5 years" for manageable datasets
+4. **Simple Queries**: Complex multi-part questions may not work well
+
+## Error Handling
+
+```pascal
+try
+  Data := TBIAI.From(Question, TAgent.Gemini, APIKey);
+except
+  on E: EBIAI do
+  begin
+    // Handle specific AI errors
+    if Pos('API Key', E.Message) > 0 then
+      ShowMessage('Invalid API key')
+    else if Pos('Empty response', E.Message) > 0 then
+      ShowMessage('AI returned no data')
+    else
+      ShowMessage('Error: ' + E.Message);
+  end;
+end;
+```
+
+## Limitations
+
+- Requires internet connection
+- API rate limits apply
+- Response quality depends on AI model
+- Not suitable for real-time applications
+- May require payment for heavy usage (except Gemini free tier)

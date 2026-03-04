@@ -1,0 +1,303 @@
+---
+title: CSV Import
+description: Import CSV and TSV files with automatic delimiter detection
+---
+
+The `TBICSV` class provides fast and flexible import of comma-separated (CSV) and tab-separated (TSV) text files. It automatically detects delimiters, headers, and data types.
+
+## Quick Start
+
+```pascal
+uses BI.CSV, BI.DataItem;
+
+var
+  Data: TDataItem;
+  
+// Import CSV file
+Data := TBICSV.FromFile('customers.csv');
+
+// Import from text
+var
+  CSV: TBICSV;
+CSV := TBICSV.Create;
+try
+  Data := CSV.ImportText('Name,Age' + #13#10 + 'John,30');
+finally
+  CSV.Free;
+end;
+```
+
+## Key Methods
+
+### FromFile
+
+Import a single CSV file:
+
+```pascal
+class function FromFile(const AFileName: String): TDataItem;
+```
+
+**Example:**
+```pascal
+Data := TBICSV.FromFile('sales_data.csv');
+BIGrid1.Data := Data;
+```
+
+### ImportFile
+
+Import with progress tracking:
+
+```pascal
+function ImportFile(const AFileName: String): TDataArray;
+```
+
+**Example:**
+```pascal
+var
+  CSV: TBICSV;
+  DataArray: TDataArray;
+  
+CSV := TBICSV.Create;
+try
+  CSV.OnProgress := ShowProgress;
+  DataArray := CSV.ImportFile('large_file.csv');
+  Data := TBISource.FromData(DataArray);
+finally
+  CSV.Free;
+end;
+```
+
+### ImportText
+
+Import from string:
+
+```pascal
+function ImportText(const AText: String): TDataItem;
+```
+
+**Example:**
+```pascal
+var
+  CSVText: String;
+  
+CSVText := 'Product,Price' + #13#10 +
+           'Widget,19.99' + #13#10 +
+           'Gadget,29.99';
+           
+Data := CSV.ImportText(CSVText);
+```
+
+### Import from TStrings
+
+```pascal
+function Import(const Strings: TStrings): TDataArray;
+```
+
+**Example:**
+```pascal
+DataArray := CSV.Import(Memo1.Lines);
+```
+
+### FromFolder
+
+Import all CSV files from a folder:
+
+```pascal
+class function FromFolder(const Folder: String): TDataItem;
+```
+
+**Example:**
+```pascal
+Data := TBICSV.FromFolder('C:\\Data\\CSVFiles');
+```
+
+## Configuration Options
+
+### Delimiter
+
+Set or auto-detect the field delimiter:
+
+```pascal
+var
+  CSV: TBICSV;
+  
+CSV := TBICSV.Create;
+CSV.Delimiter := ';'; // Use semicolon
+// Or use automatic detection:
+CSV.Delimiter := TBICSV.AutomaticDelimiter; // Default
+```
+
+**Supported delimiters:**
+- Comma: `,`
+- Tab: `#9`
+- Semicolon: `;`
+- Space: ` `
+- Custom: any character
+
+### Quote Character
+
+```pascal
+CSV.Quote := '"'; // Default is double-quote
+```
+
+### Headers
+
+Control header row detection:
+
+```pascal
+type TTextHeaders = (Auto, Yes, No);
+
+CSV.Header.Headers := TTextHeaders.Auto; // Default - auto-detect
+CSV.Header.Headers := TTextHeaders.Yes;  // First row is headers
+CSV.Header.Headers := TTextHeaders.No;   // No headers, generate names
+
+// Number of header rows to skip
+CSV.Header.Count := 1; // Default
+```
+
+### Missing Values
+
+```pascal
+CSV.MissingValue := ''; // Default empty string
+CSV.MissingValue := 'N/A';
+```
+
+## Advanced Examples
+
+### Custom Delimiter and Headers
+
+```pascal
+var
+  CSV: TBICSV;
+  
+CSV := TBICSV.Create;
+try
+  CSV.Delimiter := ';';
+  CSV.Header.Headers := TTextHeaders.Yes;
+  CSV.Header.Count := 2; // Skip first 2 rows
+  
+  Data := CSV.ImportFile('european_data.csv');
+finally
+  CSV.Free;
+end;
+```
+
+### Import with Filters
+
+```pascal
+CSV.IncludePattern := '*.csv';
+CSV.ExcludePattern := 'temp_*.csv';
+Data := CSV.Import('C:\\Data', True); // Recursive
+```
+
+### Using DataDefinition
+
+```pascal
+uses BI.Persist;
+
+var
+  Def: TDataDefinition;
+  CSV: TBICSV;
+  
+Def := TDataDefinition.Create;
+try
+  Def['Delimiter'] := ';';
+  Def['Quote'] := '"';
+  Def['HeaderCount'] := '1';
+  Def['Headers'] := 'Yes';
+  
+  CSV := TBICSV.Create(Def);
+  try
+    Data := CSV.ImportFile('data.csv');
+  finally
+    CSV.Free;
+  end;
+finally
+  Def.Free;
+end;
+```
+
+## Performance Tips
+
+1. **Large Files**: For files over 100MB, use the progress event to provide user feedback
+
+2. **Memory**: CSV import is optimized for speed with automatic capacity expansion
+
+3. **Batch Processing**: Use `FromFolder` to import multiple files efficiently
+
+```pascal
+// Good for large files
+CSV.OnProgress := procedure(Sender: TObject; Percent: Integer; var Cancel: Boolean)
+  begin
+    Application.ProcessMessages;
+    if Percent mod 10 = 0 then
+      ShowStatus('Loading: ' + IntToStr(Percent) + '%');
+  end;
+```
+
+## Export to CSV
+
+Use `TBICSVExport` to save data back to CSV:
+
+```pascal
+uses BI.CSV;
+
+var
+  Export: TBICSVExport;
+  
+Export := TBICSVExport.Create;
+try
+  Export.Data := MyData;
+  Export.Delimiter := ',';
+  Export.Quote := '"';
+  Export.Header := True;
+  
+  Export.SaveToFile('output.csv');
+finally
+  Export.Free;
+end;
+```
+
+## File Format Detection
+
+```pascal
+// Check if extension is supported
+if TBICSV.Supports('.csv') then
+  Data := TBICSV.FromFile(FileName);
+
+// Get file filter for dialogs
+OpenDialog1.Filter := TBICSV.FileFilter.ToString;
+// Returns: 'CSV files|*.csv|TSV files|*.tsv|Text files|*.txt'
+```
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Wrong delimiter detected">
+    Set the delimiter explicitly:
+    ```pascal
+    CSV.Delimiter := ',';
+    ```
+  </Accordion>
+  
+  <Accordion title="Headers not detected correctly">
+    Force header mode:
+    ```pascal
+    CSV.Header.Headers := TTextHeaders.Yes;
+    CSV.Header.Count := 1;
+    ```
+  </Accordion>
+  
+  <Accordion title="Special characters in fields">
+    Check the quote character setting:
+    ```pascal
+    CSV.Quote := '"';
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+- [Data Import Overview](/import/overview)
+- [JSON Import](/import/json)
+- [Excel Import](/import/excel)

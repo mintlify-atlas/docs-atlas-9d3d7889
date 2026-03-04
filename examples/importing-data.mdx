@@ -1,0 +1,283 @@
+---
+title: Importing Data
+description: Import data from CSV, JSON, XML, Excel, databases, and more
+---
+
+TeeBI supports importing data from multiple formats with just a few lines of code.
+
+## CSV Import
+
+```pascal
+uses BI.CSV;
+
+procedure ImportCSV;
+var CSV: TBICSV;
+    Data: TDataItem;
+begin
+  CSV := TBICSV.Create;
+  try
+    // Configure CSV options
+    CSV.Delimiter := ',';
+    CSV.Quote := '"';
+    CSV.Header.Headers := TTextHeaders.Auto;  // Auto-detect headers
+    CSV.MissingValue := 'NA';  // Treat 'NA' as null
+    CSV.ZeroOneAsBoolean := True;  // 0/1 as Boolean
+
+    // Import from file
+    Data := CSV.ImportFile('data.csv');
+
+    // Or use class method for one-liner:
+    // Data := TBICSV.FromFile('data.csv');
+  finally
+    CSV.Free;
+  end;
+end;
+```
+
+### CSV Import Options
+
+```pascal
+// From text string
+Data := TBICSV.FromText('A,B,C' + #13#10 + '1,2,3');
+
+// From TStrings (Memo, StringList)
+Data := TBICSV.FromStrings(Memo1.Lines);
+
+// From URL
+CSV.ImportURL('http://example.com/data.csv');
+
+// From folder (recursive)
+CSV.Import('c:\\mydata', True);
+```
+
+## JSON Import
+
+```pascal
+uses BI.JSON;
+
+procedure ImportJSON;
+var JSON: TBIJSON;
+begin
+  JSON := TBIJSON.Create;
+  try
+    JSON.Format := TBIJSONFormat.Normal;  // Or .Array for MongoDB
+    JSON.MissingValue := 'NA';
+    JSON.ZeroOneAsBoolean := True;
+
+    Data := JSON.Import(Memo1.Lines);
+
+    // Class method:
+    // Data := TBIJSON.FromFile('data.json');
+  finally
+    JSON.Free;
+  end;
+end;
+```
+
+## XML Import
+
+```pascal
+uses BI.XMLData;
+
+procedure ImportXML;
+var XML: TBIXML;
+begin
+  XML := TBIXML.Create;
+  try
+    XML.ExcludePattern := 'SYS*';  // Exclude matching nodes
+    XML.MissingValue := 'NA';
+    XML.ZeroOneAsBoolean := True;
+
+    Data := XML.ImportText(MemoXML.Text);
+
+    // Class method:
+    // Data := TBIXML.FromFile('data.xml');
+  finally
+    XML.Free;
+  end;
+end;
+```
+
+## Database Import
+
+<Tabs>
+  <Tab title="VCL">
+```pascal
+uses BI.Db;
+
+procedure ImportDatabase;
+var DB: TBIDB;
+begin
+  DB := TBIDB.Create;
+  try
+    // Import all tables from connection
+    Data := DB.Import(FDConnection1);
+
+    // Import single dataset
+    Data := TBIDB.FromDataSet(FDQuery1);
+
+    // Exclude system tables
+    DB.ExcludePattern := 'SYS*';
+  finally
+    DB.Free;
+  end;
+end;
+```
+  </Tab>
+  <Tab title="FMX">
+```pascal
+uses BI.Db;
+
+procedure ImportDatabase;
+var DB: TBIDB;
+begin
+  DB := TBIDB.Create;
+  try
+    // Import from FireDAC connection
+    Data := DB.Import(FDConnection1);
+
+    // Import specific query
+    Data := TBIDB.FromDataSet(FDQuery1);
+  finally
+    DB.Free;
+  end;
+end;
+```
+  </Tab>
+</Tabs>
+
+## Excel Import
+
+```pascal
+uses BI.Excel;
+
+procedure ImportExcel;
+var Excel: TBIExcel;
+begin
+  Excel := TBIExcel.Create;
+  try
+    Excel.HeaderCount := 2;  // Number of header rows
+    Excel.Range := 'A1:D100';  // Optional range
+    Excel.WorkSheet := 'Sheet1';  // Optional sheet name
+
+    Data := Excel.ImportFile('workbook.xlsx');
+
+    // Class method:
+    // Data := TBIExcel.FromFile('workbook.xlsx');
+
+    // From URL
+    // Data := Excel.ImportURL('http://example.com/data.xlsx');
+  finally
+    Excel.Free;
+  end;
+end;
+```
+
+## HTML Import
+
+```pascal
+uses BI.HTML;
+
+procedure ImportHTML;
+var HTML: TBIHTML;
+begin
+  HTML := TBIHTML.Create;
+  try
+    Data := HTML.FromText(MemoHTML.Text);
+  finally
+    HTML.Free;
+  end;
+end;
+```
+
+## Import from Objects (ORM)
+
+```pascal
+uses BI.DataSource;
+
+type
+  TCustomer = class
+    ID: Integer;
+    Name: String;
+    Email: String;
+  end;
+
+var
+  Customers: TArray<TCustomer>;
+  Data: TDataItem;
+begin
+  // TeeBI uses RTTI to automatically extract fields
+  Data := TTypeProvider<TCustomer>.Create(Self, Customers).Data;
+end;
+```
+
+## Import from Components
+
+```pascal
+uses BI.DataSource;
+
+// Automatic detection of component type
+Data := TComponentImporter.From(Self, Memo1.Lines);
+Data := TComponentImporter.From(Self, DataSource1);
+Data := TComponentImporter.From(Self, ClientDataSet1);
+```
+
+## Import from URL (Auto-detect format)
+
+```pascal
+uses BI.DataSource;
+
+// Automatically detects CSV, JSON, XML, etc.
+Data := TBIURLSource.From('https://api.example.com/data');
+```
+
+## Import from AI
+
+```pascal
+uses BI.AI;
+
+// Import data from AI agents like Google Gemini
+Data := TBIAI.From('Give me the 10 highest mountains by elevation in CSV format');
+```
+
+## Automatic File Import
+
+TeeBI can automatically detect file formats:
+
+```pascal
+uses BI.Persist;
+
+// Detects .csv, .json, .xml, .xlsx, etc.
+Data := TBIFileSource.From('unknown_file.dat');
+```
+
+## Performance Tips
+
+<AccordionGroup>
+  <Accordion title="Large Files">
+    For files larger than 100MB, consider:
+    - Loading in chunks if possible
+    - Using 64-bit compilation
+    - Enabling parallel processing for queries
+  </Accordion>
+  
+  <Accordion title="Memory Management">
+    Always free imported data:
+    ```pascal
+    Data.Free;  // Essential to avoid memory leaks
+    ```
+  </Accordion>
+  
+  <Accordion title="Header Detection">
+    CSV auto-detection works best when:
+    - First row contains text headers
+    - Data rows start from row 2
+    - Headers don't contain special characters
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+- [Basic Usage](/examples/basic-usage) - Complete workflow example
+- [Simple Queries](/examples/simple-queries) - Query imported data
+- [Master-Detail](/examples/master-detail) - Work with related tables

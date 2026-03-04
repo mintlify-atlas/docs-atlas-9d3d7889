@@ -1,0 +1,165 @@
+---
+title: Pivot Dimensions
+description: Configure rows and columns with GroupBy dimensions
+---
+
+Dimensions (GroupBy) define how data is organized in rows and columns of a pivot table.
+
+## Adding Dimensions
+
+Use `AddGroupBy` to add dimensions from data items:
+
+```pascal
+var
+  Summary: TSummary;
+  GroupBy: TGroupBy;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    // Add from data item
+    GroupBy := Summary.AddGroupBy(Data['Category']);
+    
+    // Add from expression
+    GroupBy := Summary.AddGroupBy(Year(Data['Date']));
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+See `BI.Summary.pas:486-488` for `AddGroupBy` methods.
+
+## Layout Orientation
+
+Control where dimensions appear using `TGroupByLayout` (`BI.Summary.pas:271`):
+
+```pascal
+type
+  TGroupByLayout = (Automatic, Rows, Items);
+```
+
+- **Automatic** - TeeBI decides optimal placement
+- **Rows** - Force dimension to rows
+- **Items** - Force dimension to columns
+
+```pascal
+GroupBy.Layout := TGroupByLayout.Rows;  // Always in rows
+```
+
+## DateTime Parts
+
+Group date/time data by specific parts using `TDateTimePart`:
+
+```pascal
+var
+  GroupBy: TGroupBy;
+begin
+  GroupBy := Summary.AddGroupBy(Data['OrderDate']);
+  
+  // Group by year
+  GroupBy.DatePart := TDateTimePart.Year;
+  
+  // Other options:
+  // TDateTimePart.Month
+  // TDateTimePart.Quarter
+  // TDateTimePart.Week
+  // TDateTimePart.Day
+  // TDateTimePart.DayOfWeek
+  // TDateTimePart.Hour
+end;
+```
+
+See `BI.Summary.pas:258-268` for `TGroupByDate` implementation.
+
+## Histograms
+
+Create numeric intervals using histograms (`BI.Summary.pas:42-103`):
+
+```pascal
+var
+  GroupBy: TGroupBy;
+begin
+  GroupBy := Summary.AddGroupBy(Data['Price']);
+  
+  // Configure histogram
+  GroupBy.Histogram.Active := True;
+  GroupBy.Histogram.NumBins := 10;      // 10 intervals
+  GroupBy.Histogram.BinSize := 100;     // $100 per bin
+  GroupBy.Histogram.Minimum := 0;
+  GroupBy.Histogram.Maximum := 1000;
+end;
+```
+
+### Histogram Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| **Active** | Boolean | Enable histogram grouping |
+| **NumBins** | Integer | Number of intervals |
+| **BinSize** | TFloat | Size of each interval |
+| **Minimum** | TFloat | Start value |
+| **Maximum** | TFloat | End value |
+| **AutoMinimum** | Boolean | Auto-calculate min |
+| **AutoMaximum** | Boolean | Auto-calculate max |
+
+## Multiple Dimensions
+
+Create hierarchical groupings:
+
+```pascal
+begin
+  // Rows: Region -> Country
+  Summary.AddGroupBy(Data['Region']);
+  Summary.AddGroupBy(Data['Country']);
+  
+  // Columns: Year -> Quarter
+  GroupBy := Summary.AddGroupBy(Data['Year']);
+  GroupBy.Layout := TGroupByLayout.Items;
+  
+  GroupBy := Summary.AddGroupBy(Data['Quarter']);
+  GroupBy.Layout := TGroupByLayout.Items;
+end;
+```
+
+## Sorting Dimensions
+
+Use `SortBy` to order dimensions:
+
+```pascal
+var
+  SortItem: TSortItem;
+begin
+  SortItem := Summary.SortBy.Add(Data['Category']);
+  SortItem.Ascending := False;  // Descending order
+end;
+```
+
+## Active Property
+
+Enable/disable dimensions without removing them:
+
+```pascal
+GroupBy.Active := False;  // Temporarily disable
+```
+
+See `BI.Summary.pas:274-317` for the complete `TGroupBy` class.
+
+## Performance Tips
+
+<Tip>
+  - Use fewer dimensions for faster calculations
+  - DateTime grouping is optimized for common parts (Year, Month, Quarter)
+  - Histograms work best with numeric data
+  - Active=False removes from calculation without deletion
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Measures" icon="calculator" href="/pivot/measures">
+    Configure value aggregations
+  </Card>
+  <Card title="Editor" icon="sliders" href="/pivot/editor">
+    Visual dimension configuration
+  </Card>
+</CardGroup>

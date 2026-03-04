@@ -1,0 +1,370 @@
+---
+title: TDataKindConvert & TDateTimeConvert
+description: Convert data types and DateTime structures
+---
+
+## TDataKindConvert
+
+Convert TDataItem between different data kinds (types).
+
+Location: `BI.Convert.pas:28`
+
+### Methods
+
+#### CanConvert
+
+```pascal
+class function CanConvert(const AData: TDataItem; const AKind: TDataKind): Boolean;
+```
+
+Checks if data can be converted to target kind without data loss.
+
+#### Convert
+
+```pascal
+class function Convert(const AData: TDataItem; const AKind: TDataKind): Boolean;
+```
+
+Converts data to new kind. Returns True if successful.
+
+### Usage Examples
+
+#### Convert Integer to Text
+
+```pascal
+var
+  Data: TDataItem;
+begin
+  Data := TDataItem.Create(TDataKind.dkInt32);
+  try
+    Data.Int32Data.Append([1, 2, 3, 4, 5]);
+    
+    // Convert to text
+    if TDataKindConvert.Convert(Data, TDataKind.dkText) then
+    begin
+      ShowMessage(Data.TextData[0]);  // '1'
+      ShowMessage('Kind: ' + Data.Kind.ToString);  // dkText
+    end;
+  finally
+    Data.Free;
+  end;
+end;
+```
+
+#### Convert Text to Numbers
+
+```pascal
+var
+  Data: TDataItem;
+begin
+  Data := TDataItem.Create(TDataKind.dkText);
+  try
+    Data.TextData.Append(['100', '200', '300']);
+    
+    // Check if convertible
+    if TDataKindConvert.CanConvert(Data, TDataKind.dkInt32) then
+    begin
+      TDataKindConvert.Convert(Data, TDataKind.dkInt32);
+      ShowMessage(IntToStr(Data.Int32Data[0]));  // 100
+    end;
+  finally
+    Data.Free;
+  end;
+end;
+```
+
+#### Convert with Precision
+
+```pascal
+var
+  Data: TDataItem;
+begin
+  Data := TDataItem.Create(TDataKind.dkDouble);
+  try
+    Data.DoubleData.Append([1.5, 2.7, 3.9]);
+    
+    // Convert to integer (rounds)
+    TDataKindConvert.Convert(Data, TDataKind.dkInt32);
+    
+    ShowMessage(IntToStr(Data.Int32Data[0]));  // 2 (rounded from 1.5)
+  finally
+    Data.Free;
+  end;
+end;
+```
+
+#### Safe Conversion
+
+```pascal
+procedure SafeConvert(const Data: TDataItem; const TargetKind: TDataKind);
+begin
+  if TDataKindConvert.CanConvert(Data, TargetKind) then
+  begin
+    if TDataKindConvert.Convert(Data, TargetKind) then
+      ShowMessage('Conversion successful')
+    else
+      ShowMessage('Conversion failed');
+  end
+  else
+    ShowMessage('Conversion would lose data');
+end;
+```
+
+### Conversion Rules
+
+**To Integer:**
+- Float values are rounded
+- Text must be valid integer
+- Boolean: True=1, False=0
+
+**To Float:**
+- Integers convert exactly
+- Text must be valid number
+- DateTime converts to days
+
+**To Text:**
+- All types can convert to text
+- Uses default formatting
+
+**To Boolean:**
+- 0 = False, non-zero = True
+- Text: 'true'/'false' (case-insensitive)
+
+**To DateTime:**
+- Numbers convert to days
+- Text must be valid date/time
+
+---
+
+## TDateTimeConvert
+
+Convert between DateTime and component structures (Year, Month, Day, etc.).
+
+Location: `BI.Convert.pas:38`
+
+### Methods
+
+#### ToTable
+
+```pascal
+class function ToTable(const AData: TDataItem): TDataItem;
+```
+
+Converts DateTime to structure with Day, Month, Year, Hour, Minute, Second, Millisecond fields.
+
+#### ToDateTime
+
+```pascal
+class function ToDateTime(const AData: TDataItem): TDataItem;
+```
+
+Converts structure with date/time fields back to DateTime.
+
+### Usage Examples
+
+#### Expand DateTime to Components
+
+```pascal
+var
+  DateData, Components: TDataItem;
+  i: Integer;
+begin
+  // Create DateTime data
+  DateData := TDataItem.Create(TDataKind.dkDateTime);
+  try
+    DateData.DateTimeData.Append([
+      EncodeDate(2024, 1, 15),
+      EncodeDate(2024, 6, 30),
+      EncodeDate(2024, 12, 25)
+    ]);
+    
+    // Convert to table
+    Components := TDateTimeConvert.ToTable(DateData);
+    try
+      // Access components
+      ShowMessage('First date:');
+      ShowMessage('Year: ' + IntToStr(Components.Items['Year'].Int32Data[0]));
+      ShowMessage('Month: ' + IntToStr(Components.Items['Month'].Int32Data[0]));
+      ShowMessage('Day: ' + IntToStr(Components.Items['Day'].Int32Data[0]));
+      
+      // Visualize
+      BIGrid1.Data := Components;
+    finally
+      Components.Free;
+    end;
+  finally
+    DateData.Free;
+  end;
+end;
+```
+
+#### Combine Components to DateTime
+
+```pascal
+var
+  Components, DateData: TDataItem;
+begin
+  // Create component structure
+  Components := TDataItem.Create(True);
+  try
+    Components.Items.Add('Year', TDataKind.dkInt32);
+    Components.Items.Add('Month', TDataKind.dkInt32);
+    Components.Items.Add('Day', TDataKind.dkInt32);
+    Components.Resize(3);
+    
+    // Fill data
+    Components.Items['Year'].Int32Data[0] := 2024;
+    Components.Items['Month'].Int32Data[0] := 3;
+    Components.Items['Day'].Int32Data[0] := 15;
+    
+    Components.Items['Year'].Int32Data[1] := 2024;
+    Components.Items['Month'].Int32Data[1] := 6;
+    Components.Items['Day'].Int32Data[1] := 20;
+    
+    Components.Items['Year'].Int32Data[2] := 2024;
+    Components.Items['Month'].Int32Data[2] := 12;
+    Components.Items['Day'].Int32Data[2] := 31;
+    
+    // Convert to DateTime
+    DateData := TDateTimeConvert.ToDateTime(Components);
+    try
+      ShowMessage(DateTimeToStr(DateData.DateTimeData[0]));
+    finally
+      DateData.Free;
+    end;
+  finally
+    Components.Free;
+  end;
+end;
+```
+
+#### Extract Time Components
+
+```pascal
+var
+  TimeData, Components: TDataItem;
+begin
+  TimeData := TDataItem.Create(TDataKind.dkDateTime);
+  try
+    TimeData.DateTimeData.Append([
+      EncodeTime(9, 30, 0, 0),
+      EncodeTime(14, 45, 30, 500),
+      EncodeTime(18, 0, 0, 0)
+    ]);
+    
+    Components := TDateTimeConvert.ToTable(TimeData);
+    try
+      ShowMessage('Hour: ' + IntToStr(Components.Items['Hour'].Int32Data[1]));
+      ShowMessage('Minute: ' + IntToStr(Components.Items['Minute'].Int32Data[1]));
+      ShowMessage('Second: ' + IntToStr(Components.Items['Second'].Int32Data[1]));
+      ShowMessage('Millisecond: ' + IntToStr(Components.Items['Millisecond'].Int32Data[1]));
+    finally
+      Components.Free;
+    end;
+  finally
+    TimeData.Free;
+  end;
+end;
+```
+
+#### Round-Trip Conversion
+
+```pascal
+var
+  Original, Components, Restored: TDataItem;
+  i: Integer;
+  Same: Boolean;
+begin
+  Original := TDataItem.Create(TDataKind.dkDateTime);
+  try
+    Original.DateTimeData.Append([
+      Now,
+      EncodeDateTime(2024, 6, 15, 14, 30, 0, 0),
+      Tomorrow
+    ]);
+    
+    // To components and back
+    Components := TDateTimeConvert.ToTable(Original);
+    try
+      Restored := TDateTimeConvert.ToDateTime(Components);
+      try
+        // Verify identical
+        Same := True;
+        for i := 0 to Original.Count - 1 do
+        begin
+          if Original.DateTimeData[i] <> Restored.DateTimeData[i] then
+          begin
+            Same := False;
+            Break;
+          end;
+        end;
+        
+        if Same then
+          ShowMessage('Round-trip successful!')
+        else
+          ShowMessage('Data changed during conversion');
+      finally
+        Restored.Free;
+      end;
+    finally
+      Components.Free;
+    end;
+  finally
+    Original.Free;
+  end;
+end;
+```
+
+### Component Fields
+
+When converting to table, these fields are created:
+
+- **Day**: 1-31
+- **Month**: 1-12
+- **Year**: Full year (e.g., 2024)
+- **Hour**: 0-23
+- **Minute**: 0-59
+- **Second**: 0-59
+- **Millisecond**: 0-999
+
+### Practical Uses
+
+#### Filter by Month
+
+```pascal
+var
+  Data, Components: TDataItem;
+begin
+  Components := TDateTimeConvert.ToTable(MyDateData);
+  try
+    // Show only June records
+    BIGrid1.Data := Components;
+    BIGrid1.Filter := TExpression.Create('Month = 6');
+  finally
+    Components.Free;
+  end;
+end;
+```
+
+#### Group by Year
+
+```pascal
+var
+  Components: TDataItem;
+  Summary: TSummary;
+begin
+  Components := TDateTimeConvert.ToTable(MyDateData);
+  try
+    Summary := TSummary.Create(nil);
+    try
+      Summary.By.Add(Components.Items['Year']);
+      Summary.Measures.Add(SalesColumn, TAggregate.Sum);
+      BIChart1.Fill(Summary);
+    finally
+      Summary.Free;
+    end;
+  finally
+    Components.Free;
+  end;
+end;
+```

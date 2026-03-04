@@ -1,0 +1,344 @@
+---
+title: TDataMerge
+description: Merge and combine multiple datasets
+---
+
+## Overview
+
+`TDataMerge` provides methods to combine multiple TDataItem structures with the same schema into a single dataset.
+
+Location: `BI.Merge.pas:21`
+
+## Methods
+
+### FromData
+
+```pascal
+class function FromData(const AData: TDataArray; const FreeData: Boolean = True): TDataItem;
+```
+
+Merges all data items into one. When FreeData is True, source items are destroyed (except the first).
+
+```pascal
+class procedure FromData(const ADest: TDataItem; const AData: TDataArray);
+```
+
+Merges copy of all items into ADest.
+
+### FromFolder
+
+```pascal
+class function FromFolder(const AFolder, AExtension: String): TDataItem;
+```
+
+Loads and merges all files with given extension from folder.
+
+### FromStore
+
+```pascal
+class function FromStore(const AStore, AName: String): TDataItem;
+```
+
+Merges all items from a TeeBI store.
+
+### CloneStructure
+
+```pascal
+class function CloneStructure(const AData: TDataItem): TDataItem;
+```
+
+Creates empty data with same structure (no data, just schema).
+
+### SameStructure
+
+```pascal
+class function SameStructure(const A, B: TDataItem): Boolean; overload;
+class function SameStructure(const AItems: TDataArray): Boolean; overload;
+```
+
+Checks if items have compatible structures.
+
+### Subtract
+
+```pascal
+class procedure Subtract(const ADest, ASource: TDataItem);
+```
+
+Removes rows from ADest that exist in ASource.
+
+### Common
+
+```pascal
+class procedure Common(const ADest: TDataItem; const A, B: TDataArray);
+```
+
+Returns rows that exist in both A and B.
+
+### Different
+
+```pascal
+class procedure Different(const ADest: TDataItem; const A, B: TDataArray);
+```
+
+Returns rows that exist in A or B but not both.
+
+## Usage Examples
+
+### Merge Multiple Files
+
+```pascal
+var
+  Data1, Data2, Data3, Merged: TDataItem;
+  Items: TDataArray;
+begin
+  Data1 := TBICSV.FromFile('january.csv');
+  Data2 := TBICSV.FromFile('february.csv');
+  Data3 := TBICSV.FromFile('march.csv');
+  
+  try
+    // Combine into array
+    Items := [Data1, Data2, Data3];
+    
+    // Merge (frees Data2 and Data3, returns Data1 with all rows)
+    Merged := TDataMerge.FromData(Items, True);
+    
+    ShowMessage('Total rows: ' + IntToStr(Merged.Count));
+    BIGrid1.Data := Merged;
+  finally
+    Merged.Free;
+  end;
+end;
+```
+
+### Merge Folder
+
+```pascal
+var
+  AllData: TDataItem;
+begin
+  // Load and merge all .csv files
+  AllData := TDataMerge.FromFolder('C:\Data\Monthly', '.csv');
+  try
+    BIChart1.Data := AllData;
+  finally
+    AllData.Free;
+  end;
+end;
+```
+
+### Merge Without Destroying Sources
+
+```pascal
+var
+  Data1, Data2, Merged: TDataItem;
+  Items: TDataArray;
+begin
+  Data1 := LoadData1;
+  Data2 := LoadData2;
+  try
+    Items := [Data1, Data2];
+    
+    // Keep original data, copy into new item
+    Merged := TDataMerge.FromData(Items, False);
+    try
+      // Use merged data
+      SaveData(Merged);
+    finally
+      Merged.Free;
+    end;
+    
+    // Data1 and Data2 still available
+  finally
+    Data1.Free;
+    Data2.Free;
+  end;
+end;
+```
+
+### Merge into Existing Data
+
+```pascal
+var
+  Destination: TDataItem;
+  Sources: TDataArray;
+begin
+  Destination := TDataItem.Create;
+  try
+    Sources := [LoadQ1, LoadQ2, LoadQ3, LoadQ4];
+    
+    // Merge into destination
+    TDataMerge.FromData(Destination, Sources);
+    
+    ShowMessage('Annual data: ' + IntToStr(Destination.Count) + ' rows');
+  finally
+    Destination.Free;
+  end;
+end;
+```
+
+### Check Compatibility
+
+```pascal
+var
+  Data1, Data2: TDataItem;
+begin
+  Data1 := LoadFile1;
+  Data2 := LoadFile2;
+  try
+    if TDataMerge.SameStructure(Data1, Data2) then
+    begin
+      // Safe to merge
+      Merged := TDataMerge.FromData([Data1, Data2]);
+    end
+    else
+      ShowMessage('Cannot merge: different structures');
+  finally
+    Data1.Free;
+    Data2.Free;
+  end;
+end;
+```
+
+### Subtract Datasets
+
+```pascal
+var
+  AllCustomers, Inactive, Active: TDataItem;
+begin
+  AllCustomers := LoadAllCustomers;
+  Inactive := LoadInactiveCustomers;
+  try
+    Active := TDataMerge.CloneStructure(AllCustomers);
+    try
+      TDataClone.Clone(AllCustomers, Active);
+      
+      // Remove inactive customers
+      TDataMerge.Subtract(Active, Inactive);
+      
+      ShowMessage('Active customers: ' + IntToStr(Active.Count));
+    finally
+      Active.Free;
+    end;
+  finally
+    AllCustomers.Free;
+    Inactive.Free;
+  end;
+end;
+```
+
+### Find Common Rows
+
+```pascal
+var
+  List1, List2, Common: TDataItem;
+  Items1, Items2: TDataArray;
+begin
+  List1 := LoadList1;
+  List2 := LoadList2;
+  try
+    Common := TDataMerge.CloneStructure(List1);
+    try
+      Items1 := List1.Items.AsArray;
+      Items2 := List2.Items.AsArray;
+      
+      // Find common rows
+      TDataMerge.Common(Common, Items1, Items2);
+      
+      ShowMessage('Common records: ' + IntToStr(Common.Count));
+      BIGrid1.Data := Common;
+    finally
+      Common.Free;
+    end;
+  finally
+    List1.Free;
+    List2.Free;
+  end;
+end;
+```
+
+### Find Differences
+
+```pascal
+var
+  Set1, Set2, Diff: TDataItem;
+  Items1, Items2: TDataArray;
+begin
+  Set1 := LoadSet1;
+  Set2 := LoadSet2;
+  try
+    Diff := TDataMerge.CloneStructure(Set1);
+    try
+      Items1 := Set1.Items.AsArray;
+      Items2 := Set2.Items.AsArray;
+      
+      // Find rows in either set but not both
+      TDataMerge.Different(Diff, Items1, Items2);
+      
+      ShowMessage('Different records: ' + IntToStr(Diff.Count));
+    finally
+      Diff.Free;
+    end;
+  finally
+    Set1.Free;
+    Set2.Free;
+  end;
+end;
+```
+
+### Merge Multiple Years
+
+```pascal
+function MergeYears(const StartYear, EndYear: Integer): TDataItem;
+var
+  Year: Integer;
+  YearData: TDataItem;
+  AllData: TArray<TDataItem>;
+begin
+  SetLength(AllData, EndYear - StartYear + 1);
+  
+  for Year := StartYear to EndYear do
+    AllData[Year - StartYear] := LoadYear(Year);
+  
+  Result := TDataMerge.FromData(AllData, True);
+end;
+
+// Usage
+var
+  Historical: TDataItem;
+begin
+  Historical := MergeYears(2020, 2024);
+  try
+    BIChart1.Data := Historical;
+  finally
+    Historical.Free;
+  end;
+end;
+```
+
+### Append with Validation
+
+```pascal
+procedure SafeMerge(const Dest: TDataItem; const Source: TDataItem);
+var
+  Items: TDataArray;
+begin
+  if not TDataMerge.SameStructure(Dest, Source) then
+    raise Exception.Create('Incompatible structures');
+  
+  Items := [Dest, Source];
+  TDataMerge.FromData(Dest, Items);
+end;
+```
+
+## Requirements
+
+- All data items must have same structure (matching fields/types)
+- Use `SameStructure` to validate before merging
+- Nested tables are supported if structures match
+
+## Performance Tips
+
+1. **Pre-allocate**: Merging allocates memory incrementally
+2. **Free Sources**: Use `FreeData := True` to reduce memory
+3. **Batch Operations**: Merge multiple files at once vs. one by one
+4. **Check Structure**: Validate compatibility before large merges

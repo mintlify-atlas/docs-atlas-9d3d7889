@@ -1,0 +1,144 @@
+---
+title: TBICSV
+description: CSV (TSV) data import and export class
+---
+
+## Overview
+
+`TBICSV` is the main class for importing and exporting CSV (Comma Separated Values) and TSV (Tab Separated Values) files into TeeBI data structures.
+
+Location: `BI.CSV.pas:36`
+
+## Constructor
+
+```pascal
+Constructor Create(const Definition: TDataDefinition = nil; const MultiThread: Boolean = False);
+```
+
+Creates a new CSV importer with optional data definition settings.
+
+## Properties
+
+### Delimiter
+```pascal
+Delimiter: Char;
+```
+Character used to separate fields. Use `AutomaticDelimiter` (#0) for automatic detection. Default tries: comma, tab, semicolon, space.
+
+### Quote
+```pascal
+Quote: Char;
+```
+Character used to quote fields containing delimiters. Default: `"`
+
+### Header
+```pascal
+Header: TCSVHeader;
+```
+Configuration for header rows:
+- `Headers`: Auto, Yes, or No
+- `Count`: Number of header rows (default: 1)
+
+## Methods
+
+### Import from File
+```pascal
+function ImportFile(const AFileName: String): TDataArray;
+```
+Imports a CSV file and returns the data.
+
+### Import from Strings
+```pascal
+function Import(const Strings: TStrings): TDataArray;
+```
+Imports CSV data from a string list.
+
+### Import from Folder
+```pascal
+function Import(const Folder: String; Recursive: Boolean = False): TDataArray;
+```
+Imports all CSV files from a folder.
+
+### Import from Text
+```pascal
+function ImportText(const AText: String): TDataItem;
+```
+Imports CSV data from a text string.
+
+### FromFolder (Class Method)
+```pascal
+class function FromFolder(const Folder: String): TDataItem;
+```
+Static method to import all CSV files from a folder into a single data item.
+
+## Supported File Types
+
+```pascal
+class function Supports(const Extension: String): Boolean;
+```
+Supports: `.csv`, `.txt`, `.tsv`
+
+## Usage Example
+
+```pascal
+var
+  CSV: TBICSV;
+  Data: TDataItem;
+begin
+  CSV := TBICSV.Create;
+  try
+    // Set delimiter (or use automatic)
+    CSV.Delimiter := ',';
+    CSV.Quote := '"';
+    CSV.Header.Headers := TTextHeaders.Yes;
+    
+    // Import from file
+    Data := TBISource.FromData(CSV.ImportFile('data.csv'));
+    
+    // Use the data
+    ShowMessage('Rows: ' + IntToStr(Data.Count));
+  finally
+    CSV.Free;
+  end;
+end;
+```
+
+---
+
+## TBICSVExport
+
+Location: `BI.CSV.pas:88`
+
+Export class for creating CSV files from TeeBI data.
+
+### Properties
+
+```pascal
+Delimiter: Char;  // Default: ','
+Header: Boolean;  // Include headers (default: True)
+Quote: Char;      // Quote character (default: '"')
+```
+
+### Export to File
+
+```pascal
+class procedure SaveToFile(const Data: TDataItem; const FileName: String);
+```
+
+### Usage Example
+
+```pascal
+var
+  Export: TBICSVExport;
+begin
+  Export := TBICSVExport.Create;
+  try
+    Export.Delimiter := ',';
+    Export.Header := True;
+    Export.Data := MyData;
+    Export.SaveToFile('output.csv');
+  finally
+    Export.Free;
+  end;
+end;
+```

@@ -1,0 +1,478 @@
+---
+title: Big Data
+description: Work with large datasets - millions and billions of rows
+---
+
+TeeBI is designed to handle big data with efficient memory management and fast processing.
+
+## Performance Characteristics
+
+- Processes **billions of cells** in memory
+- Optimized array-based storage
+- Zero-copy operations where possible
+- Multi-threaded query execution
+- Requires 64-bit compilation for datasets > 3GB
+
+## Creating Large Datasets
+
+```pascal
+uses
+  BI.DataItem, System.Diagnostics;
+
+// Create 1 million rows
+function CreateLargeDataset: TDataItem;
+const
+  RowCount = 1000000;
+var
+  ID, Value, Category: TDataItem;
+  I: Integer;
+  Stopwatch: TStopwatch;
+begin
+  Stopwatch := TStopwatch.StartNew;
+
+  Result := TDataItem.Create(True);
+
+  // Create columns
+  ID := TDataItem.Create(TDataKind.dkInt32, 'ID');
+  Value := TDataItem.Create(TDataKind.dkDouble, 'Value');
+  Category := TDataItem.Create(TDataKind.dkText, 'Category');
+
+  Result.Items.Add(ID);
+  Result.Items.Add(Value);
+  Result.Items.Add(Category);
+
+  // Allocate memory
+  Result.Resize(RowCount);
+
+  // Fill data
+  for I := 0 to RowCount - 1 do
+  begin
+    ID.Int32Data[I] := I;
+    Value.DoubleData[I] := Random * 1000;
+    Category.TextData[I] := 'Category' + IntToStr(Random(10));
+  end;
+
+  ShowMessage(Format('Created %d rows in %d ms',
+    [RowCount, Stopwatch.ElapsedMilliseconds]));
+end;
+```
+
+## Billion Row Example
+
+```pascal
+{$IFNDEF CPUX64}
+{$MESSAGE WARN 'This example requires 64-bit platform'}
+{$ENDIF}
+
+uses
+  BI.DataItem, BI.Persist, System.Diagnostics;
+
+// Create 1 billion cells (250 million rows x 4 columns)
+function CreateBillionCells: TDataItem;
+const
+  Rows = 250000000;  // 250 million rows
+var
+  Stopwatch: TStopwatch;
+begin
+  Stopwatch := TStopwatch.StartNew;
+
+  Result := TDataItem.Create(True);
+
+  // 4 columns = 1 billion cells
+  Result.Items.Add('ID', TDataKind.dkInt32);
+  Result.Items.Add('Value1', TDataKind.dkDouble);
+  Result.Items.Add('Value2', TDataKind.dkDouble);
+  Result.Items.Add('Category', TDataKind.dkInt32);
+
+  Result.Resize(Rows);
+
+  // Fill with data (can be parallelized)
+  for var I := 0 to Rows - 1 do
+  begin
+    Result[0].Int32Data[I] := I;
+    Result[1].DoubleData[I] := Random * 1000;
+    Result[2].DoubleData[I] := Random * 1000;
+    Result[3].Int32Data[I] := Random(100);
+  end;
+
+  ShowMessage(Format('Created %d billion cells in %d sec',
+    [Rows * 4 div 1000000000,
+     Stopwatch.ElapsedMilliseconds div 1000]));
+end;
+```
+
+## Save and Load Large Datasets
+
+```pascal
+uses
+  BI.Persist, System.IOUtils;
+
+// Save to disk (compressed binary format)
+procedure SaveBigData;
+var
+  Data: TDataItem;
+  FileName: String;
+  FileSize: Int64;
+begin
+  Data := CreateBillionCells;
+  try
+    FileName := TPath.Combine(TPath.GetTempPath, 'big_data.bi');
+
+    // Save (4.5GB for 1 billion cells)
+    TDataItemPersistence.Save(Data, FileName);
+
+    FileSize := TBIFileSource.GetFileSize(FileName);
+    ShowMessage(Format('Saved to: %s (%s)',
+      [FileName, FormatBytes(FileSize)]));
+  finally
+    Data.Free;
+  end;
+end;
+
+// Load from disk
+procedure LoadBigData;
+var
+  Data: TDataItem;
+  FileName: String;
+  Stopwatch: TStopwatch;
+begin
+  FileName := TPath.Combine(TPath.GetTempPath, 'big_data.bi');
+
+  if not TFile.Exists(FileName) then
+  begin
+    ShowMessage('File not found');
+    Exit;
+  end;
+
+  Stopwatch := TStopwatch.StartNew;
+
+  Data := TDataItemPersistence.Load(FileName);
+  try
+    ShowMessage(Format('Loaded %d rows in %d sec',
+      [Data.Count, Stopwatch.ElapsedMilliseconds div 1000]));
+
+    // Use data...
+  finally
+    Data.Free;
+  end;
+end;
+```
+
+## Query Large Datasets
+
+```pascal
+uses
+  BI.SQL, System.Diagnostics;
+
+// Fast aggregation on 250 million rows
+procedure QueryBigData;
+var
+  Data, Result: TDataItem;
+  Stopwatch: TStopwatch;
+begin
+  Data := LoadBigData;  // 250 million rows
+  try
+    Stopwatch := TStopwatch.StartNew;
+
+    // GROUP BY aggregation
+    Result := TBISQL.From(Data,
+      'sum(Value1), avg(Value2), count(*) group by Category');
+    try
+      ShowMessage(Format('Grouped 250M rows in %d ms',
+        [Stopwatch.ElapsedMilliseconds]));
+
+      BIGrid1.Data := Result;
+    finally
+      // Don't free Result if assigned to grid
+    end;
+  finally
+    Data.Free;
+  end;
+end;
+```
+
+## Parallel Processing
+
+```pascal
+uses
+  System.Threading, System.Diagnostics;
+
+{$IF CompilerVersion > 27}  // XE7 and up
+procedure ParallelQuery;
+var
+  Data: TDataItem;
+  Results: array[0..3] of TDataItem;
+  Stopwatch: TStopwatch;
+begin
+  Data := LoadBigData;
+  try
+    Stopwatch := TStopwatch.StartNew;
+
+    // Run 4 queries in parallel
+    TParallel.For(0, 3,
+      procedure(Index: Integer)
+      begin
+        case Index of
+          0: Results[0] := TBISQL.From(Data, 'sum(Value1) group by Category');
+          1: Results[1] := TBISQL.From(Data, 'avg(Value2) group by Category');
+          2: Results[2] := TBISQL.From(Data, 'count(*) group by Category');
+          3: Results[3] := TBISQL.From(Data, 'max(Value1) group by Category');
+        end;
+      end
+    );
+
+    ShowMessage(Format('4 parallel queries in %d ms',
+      [Stopwatch.ElapsedMilliseconds]));
+
+    // Use results...
+
+    // Cleanup
+    for var I := 0 to 3 do
+      Results[I].Free;
+  finally
+    Data.Free;
+  end;
+end;
+{$ENDIF}
+```
+
+## Memory Usage
+
+```pascal
+uses
+  BI.DataItem;
+
+// Calculate dataset memory usage
+function CalculateMemoryUsage(const Data: TDataItem): Int64;
+var
+  Column: TDataItem;
+begin
+  Result := 0;
+
+  for var I := 0 to Data.Items.Count - 1 do
+  begin
+    Column := Data.Items[I];
+
+    case Column.Kind of
+      dkBoolean: Result := Result + Data.Count;  // 1 byte per value
+      dkInt32: Result := Result + Data.Count * 4;
+      dkInt64: Result := Result + Data.Count * 8;
+      dkDouble: Result := Result + Data.Count * 8;
+      dkDateTime: Result := Result + Data.Count * 8;
+      dkText: Result := Result + EstimateTextSize(Column);
+    end;
+  end;
+end;
+
+function EstimateTextSize(const TextColumn: TDataItem): Int64;
+begin
+  // Rough estimate: average 20 chars per string
+  Result := TextColumn.Count * 20 * SizeOf(Char);
+end;
+```
+
+## Complete Example: Big Data Demo
+
+```pascal
+uses
+  BI.DataItem, BI.Persist, BI.SQL,
+  VCLBI.Grid, VCLBI.DataViewer,
+  System.IOUtils, System.Diagnostics;
+
+type
+  TBigDataForm = class(TForm)
+    BtnCreate: TButton;
+    BtnLoad: TButton;
+    BtnQuery: TButton;
+    BtnView: TButton;
+    BtnClose: TButton;
+    MemoInfo: TMemo;
+    LabelFile: TLabel;
+    LabelLoadTime: TLabel;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure BtnCreateClick(Sender: TObject);
+    procedure BtnLoadClick(Sender: TObject);
+    procedure BtnQueryClick(Sender: TObject);
+    procedure BtnViewClick(Sender: TObject);
+    procedure BtnCloseClick(Sender: TObject);
+  private
+    Data: TDataItem;
+    FileName: String;
+    procedure ShowDataInfo;
+  end;
+
+procedure TBigDataForm.FormCreate(Sender: TObject);
+begin
+  FileName := TPath.Combine(TPath.GetTempPath, 'big_data.bi');
+  LabelFile.Caption := FileName;
+
+  BtnLoad.Enabled := TFile.Exists(FileName);
+
+  if BtnLoad.Enabled then
+  begin
+    var FileSize := TBIFileSource.GetFileSize(FileName);
+    MemoInfo.Lines.Add('File exists: ' + FormatBytes(FileSize));
+  end;
+end;
+
+procedure TBigDataForm.BtnCreateClick(Sender: TObject);
+var
+  Stopwatch: TStopwatch;
+const
+  Rows = 10000000;  // 10 million rows
+begin
+  Screen.Cursor := crHourGlass;
+  try
+    Data.Free;
+
+    MemoInfo.Clear;
+    MemoInfo.Lines.Add('Creating ' + IntToStr(Rows) + ' rows...');
+    Application.ProcessMessages;
+
+    Stopwatch := TStopwatch.StartNew;
+
+    // Create data
+    Data := TDataItem.Create(True);
+    Data.Items.Add('ID', TDataKind.dkInt32);
+    Data.Items.Add('Value', TDataKind.dkDouble);
+    Data.Items.Add('Category', TDataKind.dkInt32);
+    Data.Resize(Rows);
+
+    for var I := 0 to Rows - 1 do
+    begin
+      Data[0].Int32Data[I] := I;
+      Data[1].DoubleData[I] := Random * 1000;
+      Data[2].Int32Data[I] := Random(100);
+    end;
+
+    MemoInfo.Lines.Add('Created in ' + 
+      IntToStr(Stopwatch.ElapsedMilliseconds) + ' ms');
+
+    // Save
+    Stopwatch := TStopwatch.StartNew;
+    TDataItemPersistence.Save(Data, FileName);
+
+    MemoInfo.Lines.Add('Saved in ' + 
+      IntToStr(Stopwatch.ElapsedMilliseconds) + ' ms');
+
+    BtnLoad.Enabled := True;
+    ShowDataInfo;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+end;
+
+procedure TBigDataForm.BtnLoadClick(Sender: TObject);
+var
+  Stopwatch: TStopwatch;
+begin
+  Screen.Cursor := crHourGlass;
+  try
+    Data.Free;
+
+    Stopwatch := TStopwatch.StartNew;
+    Data := TDataItemPersistence.Load(FileName);
+
+    LabelLoadTime.Caption := 'Loaded in ' + 
+      IntToStr(Stopwatch.ElapsedMilliseconds) + ' ms';
+
+    ShowDataInfo;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+end;
+
+procedure TBigDataForm.BtnQueryClick(Sender: TObject);
+var
+  Result: TDataItem;
+  Stopwatch: TStopwatch;
+begin
+  if Data = nil then
+  begin
+    ShowMessage('Load data first');
+    Exit;
+  end;
+
+  Screen.Cursor := crHourGlass;
+  try
+    Stopwatch := TStopwatch.StartNew;
+
+    Result := TBISQL.From(Data,
+      'sum(Value), avg(Value), count(*) group by Category');
+    try
+      ShowMessage(Format('Grouped %d rows in %d ms',
+        [Data.Count, Stopwatch.ElapsedMilliseconds]));
+
+      TDataViewer.View(Self, Result);
+    finally
+      Result.Free;
+    end;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+end;
+
+procedure TBigDataForm.BtnViewClick(Sender: TObject);
+begin
+  if Data <> nil then
+    TDataViewer.View(Self, Data);
+end;
+
+procedure TBigDataForm.BtnCloseClick(Sender: TObject);
+begin
+  Close;
+end;
+
+procedure TBigDataForm.ShowDataInfo;
+begin
+  if Data <> nil then
+  begin
+    MemoInfo.Clear;
+    MemoInfo.Lines.Add('Rows: ' + IntToStr(Data.Count));
+    MemoInfo.Lines.Add('Columns: ' + IntToStr(Data.Items.Count));
+    MemoInfo.Lines.Add('Cells: ' + 
+      IntToStr(Int64(Data.Count) * Data.Items.Count));
+    MemoInfo.Lines.Add('Memory: ~' + 
+      FormatBytes(CalculateMemoryUsage(Data)));
+
+    BtnView.Enabled := True;
+    BtnQuery.Enabled := True;
+  end;
+end;
+
+procedure TBigDataForm.FormDestroy(Sender: TObject);
+begin
+  Data.Free;
+end;
+```
+
+## Performance Tips
+
+<CardGroup cols={2}>
+  <Card title="64-bit Platform" icon="computer">
+    Always use 64-bit compilation for data > 3GB
+  </Card>
+  <Card title="Pre-allocate Memory" icon="memory">
+    Use `Resize(Count)` once instead of growing incrementally
+  </Card>
+  <Card title="Use Appropriate Types" icon="hashtag">
+    Int32 uses less memory than Int64, Float less than Double
+  </Card>
+  <Card title="Create Indexes" icon="bolt">
+    Index frequently queried columns for 10-100x speedup
+  </Card>
+  <Card title="Parallel Queries" icon="diagram-project">
+    Use TParallel for multi-core speedup
+  </Card>
+  <Card title="Binary Storage" icon="floppy-disk">
+    TeeBI .bi format is 10x faster than CSV/JSON
+  </Card>
+</CardGroup>
+
+## See Also
+
+- [Parallel Processing](/examples/parallel-processing) - Multi-threaded queries
+- [SQL Queries](/examples/sql-queries) - Fast aggregation
+- [Importing Data](/examples/importing-data) - Load large files
+- [Simple Queries](/examples/simple-queries) - Filter large datasets

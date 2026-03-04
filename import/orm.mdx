@@ -1,0 +1,563 @@
+---
+title: ORM Import
+description: Map custom objects, records, and arrays to TDataItem structures using RTTI
+---
+
+TeeBI's ORM (Object-Relational Mapping) functionality allows you to automatically convert custom records, classes, and arrays into `TDataItem` structures using Delphi's RTTI (Run-Time Type Information).
+
+## Quick Start
+
+```pascal
+uses BI.RTTI, BI.DataItem;
+
+type
+  TCustomer = record
+    ID: Integer;
+    Name: String;
+    Email: String;
+    Active: Boolean;
+  end;
+
+var
+  Customers: array of TCustomer;
+  Provider: TTypeProvider<TCustomer>;
+  Data: TDataItem;
+  
+// Create provider and add data
+Provider := TTypeProvider<TCustomer>.Create(Self);
+try
+  Provider.Add(Customers);
+  Data := Provider.Data;
+  
+  BIGrid1.Data := Data;
+finally
+  Provider.Free;
+end;
+```
+
+## TTypeProvider
+
+The generic provider for type `T`:
+
+```pascal
+TTypeProvider<T> = class(TRTTIProvider)
+```
+
+### Constructor
+
+```pascal
+constructor Create(AOwner: TComponent);
+constructor CreateArray(const AOwner: TComponent; const AValue: array of T);
+```
+
+**Examples:**
+
+```pascal
+// Create empty
+Provider := TTypeProvider<TCustomer>.Create(Self);
+
+// Create with initial data
+Provider := TTypeProvider<TCustomer>.CreateArray(Self, MyCustomers);
+Data := Provider.Data;
+```
+
+## Adding Data
+
+### Add Single Item
+
+```pascal
+procedure Add(const AValue: T);
+```
+
+**Example:**
+
+```pascal
+var
+  Customer: TCustomer;
+  
+Customer.ID := 1;
+Customer.Name := 'John Smith';
+Customer.Email := 'john@example.com';
+Customer.Active := True;
+
+Provider.Add(Customer);
+```
+
+### Add Array
+
+```pascal
+procedure Add(const AValue: array of T);
+```
+
+**Example:**
+
+```pascal
+var
+  Customers: array of TCustomer;
+  
+SetLength(Customers, 3);
+// Fill array...
+
+Provider.Add(Customers);
+```
+
+### Add TList
+
+```pascal
+procedure Add(const AValue: TList<T>);
+```
+
+**Example:**
+
+```pascal
+uses System.Generics.Collections;
+
+var
+  CustomerList: TList<TCustomer>;
+  
+CustomerList := TList<TCustomer>.Create;
+try
+  // Add customers to list...
+  
+  Provider.Add(CustomerList);
+finally
+  CustomerList.Free;
+end;
+```
+
+### Add TCollection
+
+```pascal
+procedure Add(const AValue: TCollection; const AMember: String);
+```
+
+**Example:**
+
+```pascal
+type
+  TCustomerItem = class(TCollectionItem)
+  published
+    CustomerID: Integer;
+    CustomerName: String;
+  end;
+
+var
+  Collection: TCollection;
+  
+Collection := TCollection.Create(TCustomerItem);
+try
+  // Add items...
+  
+  Provider.Add(Collection, 'CustomerID');
+finally
+  Collection.Free;
+end;
+```
+
+## Reading Data
+
+### Array Access
+
+```pascal
+property Items[const Index: TInteger]: T; default;
+```
+
+**Example:**
+
+```pascal
+var
+  Customer: TCustomer;
+  
+// Read item at index 0
+Customer := Provider[0];
+ShowMessage(Customer.Name);
+
+// Modify and update
+Customer.Name := 'Jane Doe';
+Provider[0] := Customer;
+```
+
+### Count
+
+```pascal
+function Count: TInteger;
+```
+
+**Example:**
+
+```pascal
+for I := 0 to Provider.Count - 1 do
+  Memo1.Lines.Add(Provider[I].Name);
+```
+
+## Data Manipulation
+
+### Find
+
+Find item in data:
+
+```pascal
+function Find(const AValue: T): TInteger;
+```
+
+**Example:**
+
+```pascal
+var
+  SearchCustomer: TCustomer;
+  Index: Integer;
+  
+SearchCustomer.ID := 42;
+Index := Provider.Find(SearchCustomer);
+
+if Index <> -1 then
+  ShowMessage('Found at index ' + IntToStr(Index));
+```
+
+### Update
+
+Replace item at index:
+
+```pascal
+procedure Update(const AIndex: TInteger; const AValue: T);
+```
+
+**Example:**
+
+```pascal
+var
+  Customer: TCustomer;
+  
+Customer := Provider[5];
+Customer.Email := 'newemail@example.com';
+Provider.Update(5, Customer);
+```
+
+### Delete
+
+Remove item at index:
+
+```pascal
+procedure Delete(const AIndex: TInteger);
+```
+
+**Example:**
+
+```pascal
+Provider.Delete(3); // Remove item at index 3
+```
+
+### Remove
+
+Remove specific item:
+
+```pascal
+procedure Remove(const AValue: T);
+```
+
+**Example:**
+
+```pascal
+var
+  Customer: TCustomer;
+  
+Customer.ID := 42;
+Provider.Remove(Customer);
+```
+
+### Clear
+
+Remove all data:
+
+```pascal
+procedure Clear;
+```
+
+**Example:**
+
+```pascal
+Provider.Clear;
+```
+
+## Advanced Configuration
+
+### Visibility
+
+Control which members are mapped:
+
+```pascal
+type
+  TVisibility = set of TMemberVisibility;
+  // mvPrivate, mvProtected, mvPublic, mvPublished
+  
+Provider := TTypeProvider<TCustomer>.CreateType(
+  Self,
+  TypeInfo(TCustomer),
+  [mvPublic, mvPublished], // Only public and published
+  TRttiMembers.Both        // Fields and properties
+);
+```
+
+### Member Types
+
+```pascal
+type
+  TRttiMembers = (Both, Fields, Properties);
+  
+Provider.Members := TRttiMembers.Fields;      // Only fields
+Provider.Members := TRttiMembers.Properties;  // Only properties
+Provider.Members := TRttiMembers.Both;        // Both (default)
+```
+
+## Complex Types
+
+### Nested Records
+
+```pascal
+type
+  TAddress = record
+    Street: String;
+    City: String;
+    ZipCode: String;
+  end;
+  
+  TCustomer = record
+    ID: Integer;
+    Name: String;
+    Address: TAddress; // Nested record
+  end;
+
+var
+  Provider: TTypeProvider<TCustomer>;
+  
+Provider := TTypeProvider<TCustomer>.Create(Self);
+try
+  Provider.Add(MyCustomers);
+  
+  // Access nested data
+  Data := Provider.Data;
+  AddressData := Data['Address'];
+finally
+  Provider.Free;
+end;
+```
+
+### Arrays in Records
+
+```pascal
+type
+  TCustomer = record
+    ID: Integer;
+    Name: String;
+    Tags: array[0..4] of String;
+  end;
+
+// Arrays are mapped as nested structures
+Provider.Add(Customer);
+```
+
+### Classes
+
+```pascal
+type
+  TCustomer = class
+  private
+    FID: Integer;
+    FName: String;
+  public
+    property ID: Integer read FID write FID;
+    property Name: String read FName write FName;
+  end;
+
+var
+  Provider: TTypeProvider<TCustomer>;
+  Customer: TCustomer;
+  
+Provider := TTypeProvider<TCustomer>.Create(Self);
+try
+  Customer := TCustomer.Create;
+  Customer.ID := 1;
+  Customer.Name := 'John';
+  
+  Provider.Add(Customer);
+finally
+  Provider.Free;
+  Customer.Free;
+end;
+```
+
+## Primary Keys
+
+Designate primary key fields:
+
+```pascal
+Provider.Primary := Provider.Data['ID'];
+```
+
+**Benefits:**
+- Faster lookups
+- Duplicate detection
+- Automatic indexing
+
+## Type Mapping
+
+Automatic mapping from Delphi types to TDataKind:
+
+| Delphi Type | TDataKind |
+|-------------|----------|
+| Integer | dkInt32 |
+| Int64 | dkInt64 |
+| Single | dkSingle |
+| Double | dkDouble |
+| Extended | dkExtended |
+| String | dkText |
+| Boolean | dkBoolean |
+| TDateTime | dkDateTime |
+| TDate | dkDateTime |
+| TTime | dkDateTime |
+
+## Complete Example
+
+```pascal
+unit ORM_Example;
+
+interface
+
+uses
+  System.SysUtils, System.Classes, BI.RTTI, BI.DataItem;
+
+type
+  TProduct = record
+    ProductID: Integer;
+    ProductName: String;
+    UnitPrice: Double;
+    UnitsInStock: Integer;
+    Discontinued: Boolean;
+  end;
+  
+  TProductManager = class
+  private
+    FProvider: TTypeProvider<TProduct>;
+    FData: TDataItem;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    
+    procedure LoadProducts(const FileName: String);
+    procedure AddProduct(const Product: TProduct);
+    function GetProduct(Index: Integer): TProduct;
+    procedure UpdateProduct(Index: Integer; const Product: TProduct);
+    procedure DeleteProduct(Index: Integer);
+    function FindByID(ProductID: Integer): Integer;
+    
+    property Data: TDataItem read FData;
+    property Count: Integer read GetCount;
+  end;
+
+implementation
+
+constructor TProductManager.Create;
+begin
+  FProvider := TTypeProvider<TProduct>.Create(nil);
+  FData := FProvider.Data;
+  FProvider.Primary := FData['ProductID'];
+end;
+
+destructor TProductManager.Destroy;
+begin
+  FProvider.Free;
+  inherited;
+end;
+
+procedure TProductManager.AddProduct(const Product: TProduct);
+begin
+  FProvider.Add(Product);
+end;
+
+function TProductManager.GetProduct(Index: Integer): TProduct;
+begin
+  Result := FProvider[Index];
+end;
+
+procedure TProductManager.UpdateProduct(Index: Integer; const Product: TProduct);
+begin
+  FProvider.Update(Index, Product);
+end;
+
+procedure TProductManager.DeleteProduct(Index: Integer);
+begin
+  FProvider.Delete(Index);
+end;
+
+function TProductManager.FindByID(ProductID: Integer): Integer;
+var
+  I: Integer;
+begin
+  Result := -1;
+  for I := 0 to FProvider.Count - 1 do
+    if FProvider[I].ProductID = ProductID then
+      Exit(I);
+end;
+
+end.
+```
+
+**Usage:**
+
+```pascal
+var
+  Manager: TProductManager;
+  Product: TProduct;
+  
+Manager := TProductManager.Create;
+try
+  // Add products
+  Product.ProductID := 1;
+  Product.ProductName := 'Widget';
+  Product.UnitPrice := 19.99;
+  Product.UnitsInStock := 100;
+  Product.Discontinued := False;
+  
+  Manager.AddProduct(Product);
+  
+  // Display in grid
+  BIGrid1.Data := Manager.Data;
+  
+  // Find and update
+  Index := Manager.FindByID(1);
+  if Index <> -1 then
+  begin
+    Product := Manager.GetProduct(Index);
+    Product.UnitPrice := 24.99;
+    Manager.UpdateProduct(Index, Product);
+  end;
+  
+finally
+  Manager.Free;
+end;
+```
+
+## Performance Tips
+
+1. **Batch Operations**: Use array/list Add for better performance
+
+```pascal
+// Good - single operation
+Provider.Add(MyLargeArray);
+
+// Slower - multiple operations
+for I := 0 to High(MyArray) do
+  Provider.Add(MyArray[I]);
+```
+
+2. **Pre-allocate**: Create provider with initial data
+
+```pascal
+Provider := TTypeProvider<T>.CreateArray(Self, InitialData);
+```
+
+## See Also
+
+- [Data Import Overview](/import/overview)
+- [Database Import](/import/databases)
+- [CSV Import](/import/csv)

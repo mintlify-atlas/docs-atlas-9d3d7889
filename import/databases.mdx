@@ -1,0 +1,417 @@
+---
+title: Database Import
+description: Connect to SQL databases and import tables with full schema detection
+---
+
+The `TBIDB` class provides comprehensive database import capabilities, supporting any database with a Delphi/FPC connection component. Import entire schemas or individual tables with automatic relationship detection.
+
+## Quick Start
+
+```pascal
+uses BI.DB, BI.DataItem, Data.DB;
+
+var
+  Data: TDataItem;
+  DataArray: TDataArray;
+  
+// Import all tables from a connection
+DataArray := TBIDB.Import(SQLConnection1, False); // Not multi-threaded
+
+// Import single table
+var
+  DB: TBIDB;
+DB := TBIDB.Create;
+try
+  Data := DB.Import(SQLConnection1, 'Customers');
+finally
+  DB.Free;
+end;
+```
+
+## Key Methods
+
+### Import Connection
+
+Import all tables from a database connection:
+
+```pascal
+class function Import(const Connection: TCustomConnection; 
+  const MultiThread: Boolean): TDataArray;
+```
+
+**Example:**
+```pascal
+var
+  Tables: TDataArray;
+  I: Integer;
+  
+Tables := TBIDB.Import(FDConnection1, False);
+
+for I := 0 to High(Tables) do
+  Memo1.Lines.Add('Table: ' + Tables[I].Name + 
+                  ', Rows: ' + IntToStr(Tables[I].Count));
+```
+
+### Import Single Table
+
+```pascal
+function Import(const Connection: TCustomConnection; 
+  const AName: String): TDataItem;
+```
+
+**Example:**
+```pascal
+var
+  DB: TBIDB;
+  Customers: TDataItem;
+  
+DB := TBIDB.Create;
+try
+  Customers := DB.Import(SQLConnection1, 'Customers');
+  BIGrid1.Data := Customers;
+finally
+  DB.Free;
+end;
+```
+
+### ImportFile
+
+Import from database files (SQLite, Access, etc):
+
+```pascal
+function ImportFile(const FileName: String): TDataArray;
+```
+
+**Example:**
+```pascal
+// For SQLite (requires appropriate engine)
+DataArray := DB.ImportFile('database.sqlite');
+```
+
+## Database Engines
+
+TBIDB is abstract and requires a specific engine. Set the engine before use:
+
+```pascal
+uses BI.DB.FireDAC;  // For FireDAC
+uses BI.DB.FPC;      // For FreePascal/Lazarus
+
+// Set engine (usually in initialization)
+TBIDB.Engine := TBIDBFireDAC.Create;
+```
+
+**Supported engines:**
+- FireDAC (Delphi)
+- IBX (InterBase Express)
+- ADO (Windows)
+- FPC/SQLDB (FreePascal)
+
+## Advanced Import Options
+
+### Multi-threaded Import
+
+For faster import of multiple tables:
+
+```pascal
+var
+  DB: TBIDB;
+  
+DB := TBIDB.Create(nil, True); // MultiThread = True
+try
+  DB.OnProgress := ShowProgress;
+  DataArray := DB.Import(SQLConnection1);
+finally
+  DB.Free;
+end;
+```
+
+### Filter Tables
+
+Import only specific tables using patterns:
+
+```pascal
+var
+  Def: TDataDefinition;
+  DB: TBIDB;
+  
+Def := TDataDefinition.Create;
+try
+  DB := TBIDB.Create(Def);
+  try
+    DB.IncludePattern := 'Customer*';
+    DB.ExcludePattern := '*_temp';
+    
+    DataArray := DB.Import(SQLConnection1);
+  finally
+    DB.Free;
+  end;
+finally
+  Def.Free;
+end;
+```
+
+### Include System Tables
+
+```pascal
+Def.AsDatabase.IncludeSystem := True;
+Def.AsDatabase.IncludeViews := True;
+```
+
+## DataDefinition Import
+
+Create connections from configuration:
+
+```pascal
+uses BI.Persist;
+
+var
+  Def: TDataDefinition;
+  Connection: TCustomConnection;
+  
+Def := TDataDefinition.Create;
+try
+  Def['Driver'] := 'MySQL';
+  Def['Server'] := 'localhost';
+  Def['Database'] := 'mydb';
+  Def['User'] := 'root';
+  Def['Password'] := 'password';
+  
+  Connection := TBIDB.Engine.CreateConnection(Def);
+  try
+    Connection.Open;
+    DataArray := TBIDB.Import(Connection, False);
+  finally
+    Connection.Free;
+  end;
+finally
+  Def.Free;
+end;
+```
+
+## Schema Detection
+
+TBIDB automatically detects:
+- **Primary Keys**: Marked on columns with `.Primary := True`
+- **Foreign Keys**: Automatic relationship detection
+- **Field Types**: Mapped to TDataKind types
+- **Indexes**: Key field detection
+
+**Example:**
+```pascal
+Customers := DB.Import(Connection, 'Customers');
+
+// Check primary key
+for I := 0 to Customers.Items.Count - 1 do
+  if Customers.Items[I].Primary then
+    ShowMessage('Primary key: ' + Customers.Items[I].Name);
+```
+
+## Execute SQL Queries
+
+Import results from SQL queries:
+
+```pascal
+var
+  Def: TDataDefinition;
+  Connection: TCustomConnection;
+  DataArray: TDataArray;
+  
+Def := TDataDefinition.Create;
+try
+  // Configure connection...
+  Def['SQL'] := 'SELECT * FROM Customers WHERE Country = ''USA''';
+  
+  Connection := TBIDB.Engine.CreateConnection(Def);
+  try
+    Connection.Open;
+    
+    // Import query results
+    DataArray := TBIDB.Import(Connection, False);
+    Data := TBISource.FromData(DataArray);
+  finally
+    Connection.Free;
+  end;
+finally
+  Def.Free;
+end;
+```
+
+## Progress Monitoring
+
+```pascal
+var
+  DB: TBIDB;
+  
+DB := TBIDB.Create;
+try
+  DB.OnProgress := procedure(Sender: TObject; 
+                             Percent: Integer; 
+                             var Cancel: Boolean)
+    begin
+      ProgressBar1.Position := Percent;
+      StatusBar1.SimpleText := 'Importing: ' + IntToStr(Percent) + '%';
+      Application.ProcessMessages;
+      
+      if StopButton.Tag = 1 then
+        Cancel := True;
+    end;
+    
+  DataArray := DB.Import(Connection);
+finally
+  DB.Free;
+end;
+```
+
+## Export to Database
+
+Use `TBIDBExport` to save TDataItem back to database:
+
+```pascal
+uses BI.DB;
+
+var
+  DataSet: TDataSet;
+  
+// Create DataSet from TDataItem
+DataSet := TBIDBExport.From(Self, MyData);
+try
+  // DataSet is now populated with data
+  // You can use it with database components
+finally
+  DataSet.Free;
+end;
+```
+
+### Add to Existing DataSet
+
+```pascal
+TBIDBExport.Add(FDTable1, MyData);
+```
+
+## Supported Databases
+
+Depending on the engine:
+
+- **SQL Server** (via FireDAC, ADO)
+- **MySQL** / **MariaDB**
+- **PostgreSQL**
+- **SQLite**
+- **Oracle**
+- **InterBase** / **Firebird**
+- **DB2**
+- **Access** (via ADO)
+- **ODBC** connections
+
+## Common Patterns
+
+### Import from FireDAC
+
+```pascal
+uses FireDAC.Comp.Client, BI.DB.FireDAC;
+
+var
+  FDConn: TFDConnection;
+  
+FDConn := TFDConnection.Create(nil);
+try
+  FDConn.DriverName := 'MySQL';
+  FDConn.Params.Values['Server'] := 'localhost';
+  FDConn.Params.Values['Database'] := 'mydb';
+  FDConn.Params.Values['User_Name'] := 'root';
+  FDConn.Params.Values['Password'] := 'password';
+  FDConn.Connected := True;
+  
+  DataArray := TBIDB.Import(FDConn, False);
+finally
+  FDConn.Free;
+end;
+```
+
+### Import Specific Tables
+
+```pascal
+var
+  DB: TBIDB;
+  Customers, Orders: TDataItem;
+  
+DB := TBIDB.Create;
+try
+  Customers := DB.Import(Connection, 'Customers');
+  Orders := DB.Import(Connection, 'Orders');
+  
+  BIGrid1.Data := Customers;
+  BIGrid2.Data := Orders;
+finally
+  DB.Free;
+end;
+```
+
+### Get Table Names
+
+```pascal
+var
+  TableNames: TStrings;
+  
+TableNames := TBIDB.GetItems(MyDataDefinition);
+try
+  ListBox1.Items.Assign(TableNames);
+finally
+  TableNames.Free;
+end;
+```
+
+## Performance Tips
+
+1. **Multi-threading**: Enable for databases with many tables
+
+```pascal
+DB := TBIDB.Create(nil, True); // Faster for 10+ tables
+```
+
+2. **Filter tables**: Import only what you need
+
+```pascal
+DB.IncludePattern := 'tbl_*';
+```
+
+3. **Use SQL**: For complex queries, use SQL instead of importing full tables
+
+```pascal
+Def['SQL'] := 'SELECT TOP 1000 * FROM LargeTable';
+```
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="No engine configured error">
+    Set the database engine before use:
+    ```pascal
+    uses BI.DB.FireDAC;
+    TBIDB.Engine := TBIDBFireDAC.Create;
+    ```
+  </Accordion>
+  
+  <Accordion title="Connection fails to open">
+    Check connection parameters and database driver installation.
+  </Accordion>
+  
+  <Accordion title="Slow import of many tables">
+    Enable multi-threading:
+    ```pascal
+    TBIDB.Import(Connection, True);
+    ```
+  </Accordion>
+  
+  <Accordion title="Memory issues with large tables">
+    Use SQL to limit rows:
+    ```pascal
+    Def['SQL'] := 'SELECT * FROM Table LIMIT 10000';
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+- [Data Import Overview](/import/overview)
+- [CSV Import](/import/csv)
+- [Excel Import](/import/excel)

@@ -1,0 +1,401 @@
+---
+title: TNode (Generic Tree)
+description: Generic tree data structure for hierarchical data
+---
+
+## Overview
+
+`TNode<T>` is a generic tree structure for organizing hierarchical data. Each node can have any number of child nodes.
+
+Location: `BI.Tree.pas:104`
+
+## Type Declaration
+
+```pascal
+TNode<T> = class
+  Data: T;  // Your custom data at this node
+  
+  // Access children
+  property Item[Index: TInteger]: TNode<T> default;
+  property Parent: TNode<T>;
+  property Index: TInteger;  // Position in parent's children
+  property Level: TInteger;  // Depth from root (0 for root)
+  
+  // Manage children
+  function Add(const AData: T): TNode<T>;
+  function Add: TNode<T>;
+  function Count: TInteger;
+  function Empty: Boolean;
+  procedure Clear;
+  procedure Delete(const Index: TInteger; const ACount: TInteger = 1);
+  
+  // Traverse tree
+  procedure ForEach(const AProc: TNodeProc; const Recursive: Boolean = True);
+end;
+```
+
+## Properties
+
+### Data
+```pascal
+Data: T;
+```
+Your custom data stored at this node.
+
+### Item[]
+```pascal
+property Item[Index: TInteger]: TNode<T> default;
+```
+Access child nodes by index.
+
+### Parent
+```pascal
+property Parent: TNode<T>;
+```
+Parent node, or nil for root nodes. Setting to nil detaches node.
+
+### Index
+```pascal
+property Index: TInteger;
+```
+Position of this node in parent's children array. Returns -1 for root.
+
+### Level
+```pascal
+property Level: TInteger;
+```
+Depth from root. Root nodes have level 0.
+
+## Methods
+
+### Add
+```pascal
+function Add(const AData: T): TNode<T>;
+function Add: TNode<T>;
+```
+Adds a child node and returns it.
+
+### Count
+```pascal
+function Count: TInteger;
+```
+Number of direct children.
+
+### Empty
+```pascal
+function Empty: Boolean;
+```
+Returns True when node has no children.
+
+### Clear
+```pascal
+procedure Clear;
+```
+Removes and destroys all child nodes recursively.
+
+### Delete
+```pascal
+procedure Delete(const Index: TInteger; const ACount: TInteger = 1);
+```
+Removes and destroys child nodes starting at Index.
+
+### ForEach
+```pascal
+type
+  TNodeProc = procedure(const Item: TNode<T>);
+  
+procedure ForEach(const AProc: TNodeProc; const Recursive: Boolean = True);
+```
+Iterates over all children, optionally recursively.
+
+## Usage Examples
+
+### Basic Tree
+
+```pascal
+var
+  Root: TNode<String>;
+  Child: TNode<String>;
+begin
+  Root := TNode<String>.Create;
+  try
+    Root.Data := 'Root';
+    
+    // Add children
+    Child := Root.Add('First Child');
+    Root.Add('Second Child');
+    
+    // Add grandchild
+    Child.Add('Grandchild');
+    
+    ShowMessage('Root has ' + IntToStr(Root.Count) + ' children');
+  finally
+    Root.Free;  // Frees entire tree
+  end;
+end;
+```
+
+### File System Tree
+
+```pascal
+type
+  TFileInfo = record
+    Name: String;
+    Size: Int64;
+    IsFolder: Boolean;
+  end;
+  
+  TFileTree = TNode<TFileInfo>;
+
+var
+  Root: TFileTree;
+  Folder, File: TFileTree;
+  Info: TFileInfo;
+begin
+  Root := TFileTree.Create;
+  try
+    // Root folder
+    Info.Name := 'C:\';
+    Info.IsFolder := True;
+    Root.Data := Info;
+    
+    // Add Documents folder
+    Info.Name := 'Documents';
+    Info.IsFolder := True;
+    Folder := Root.Add(Info);
+    
+    // Add file in Documents
+    Info.Name := 'readme.txt';
+    Info.Size := 1024;
+    Info.IsFolder := False;
+    Folder.Add(Info);
+  finally
+    Root.Free;
+  end;
+end;
+```
+
+### Organization Chart
+
+```pascal
+type
+  TEmployee = record
+    Name: String;
+    Title: String;
+    Department: String;
+  end;
+  
+  TOrgChart = TNode<TEmployee>;
+
+var
+  CEO, VP1, VP2, Manager: TOrgChart;
+  Emp: TEmployee;
+begin
+  CEO := TOrgChart.Create;
+  try
+    // CEO
+    Emp.Name := 'Alice Smith';
+    Emp.Title := 'CEO';
+    CEO.Data := Emp;
+    
+    // VPs report to CEO
+    Emp.Name := 'Bob Jones';
+    Emp.Title := 'VP Sales';
+    VP1 := CEO.Add(Emp);
+    
+    Emp.Name := 'Carol White';
+    Emp.Title := 'VP Engineering';
+    VP2 := CEO.Add(Emp);
+    
+    // Managers report to VPs
+    Emp.Name := 'Dave Brown';
+    Emp.Title := 'Sales Manager';
+    VP1.Add(Emp);
+    
+    // Print org chart
+    CEO.ForEach(
+      procedure(const Item: TOrgChart)
+      begin
+        WriteLn(
+          StringOfChar(' ', Item.Level * 2) +
+          Item.Data.Name + ' - ' + Item.Data.Title
+        );
+      end,
+      True  // Recursive
+    );
+  finally
+    CEO.Free;
+  end;
+end;
+```
+
+### Menu Tree
+
+```pascal
+type
+  TMenuItem = record
+    Caption: String;
+    OnClick: TNotifyEvent;
+  end;
+  
+  TMenuTree = TNode<TMenuItem>;
+
+var
+  MainMenu, FileMenu, EditMenu: TMenuTree;
+  Item: TMenuItem;
+begin
+  MainMenu := TMenuTree.Create;
+  try
+    // File menu
+    Item.Caption := 'File';
+    FileMenu := MainMenu.Add(Item);
+    
+    Item.Caption := 'Open';
+    Item.OnClick := FileOpenClick;
+    FileMenu.Add(Item);
+    
+    Item.Caption := 'Save';
+    Item.OnClick := FileSaveClick;
+    FileMenu.Add(Item);
+    
+    // Edit menu
+    Item.Caption := 'Edit';
+    EditMenu := MainMenu.Add(Item);
+    
+    Item.Caption := 'Cut';
+    Item.OnClick := EditCutClick;
+    EditMenu.Add(Item);
+  finally
+    MainMenu.Free;
+  end;
+end;
+```
+
+### Tree Traversal
+
+```pascal
+var
+  Root: TNode<Integer>;
+  Total: Integer;
+begin
+  Root := TNode<Integer>.Create;
+  try
+    Root.Data := 1;
+    Root.Add(2);
+    Root.Add(3);
+    Root[0].Add(4);
+    Root[0].Add(5);
+    
+    // Sum all values
+    Total := 0;
+    Root.ForEach(
+      procedure(const Item: TNode<Integer>)
+      begin
+        Inc(Total, Item.Data);
+      end,
+      True  // Recursive
+    );
+    
+    ShowMessage('Total: ' + IntToStr(Total));  // 15
+  finally
+    Root.Free;
+  end;
+end;
+```
+
+### Accessing Nodes
+
+```pascal
+var
+  Root: TNode<String>;
+begin
+  Root := TNode<String>.Create;
+  try
+    Root.Add('First');
+    Root.Add('Second');
+    Root.Add('Third');
+    
+    // Access by index
+    ShowMessage(Root[0].Data);  // 'First'
+    ShowMessage(Root[1].Data);  // 'Second'
+    
+    // Navigate up
+    ShowMessage(Root[0].Parent.Data);  // 'Root'
+    
+    // Check position
+    ShowMessage(IntToStr(Root[1].Index));  // 1
+    
+    // Check level
+    ShowMessage(IntToStr(Root.Level));      // 0 (root)
+    ShowMessage(IntToStr(Root[0].Level));   // 1 (child)
+  finally
+    Root.Free;
+  end;
+end;
+```
+
+### Detaching Nodes
+
+```pascal
+var
+  Root, Node: TNode<String>;
+begin
+  Root := TNode<String>.Create;
+  try
+    Node := Root.Add('Child');
+    
+    // Detach from parent
+    Node.Parent := nil;
+    
+    // Node is now independent
+    Root.Free;   // Doesn't destroy Node
+    Node.Free;   // Must free separately
+  except
+    Root.Free;
+  end;
+end;
+```
+
+## Type Aliases
+
+For convenience, create type aliases:
+
+```pascal
+type
+  TStringTree = TNode<String>;
+  TIntTree = TNode<Integer>;
+  TFloatTree = TNode<Single>;
+  
+var
+  Tree: TStringTree;
+begin
+  Tree := TStringTree.Create;
+  // ...
+end;
+```
+
+## Memory Management
+
+- Destroying a node destroys all its children recursively
+- Detaching a node (Parent := nil) does NOT destroy it
+- Use Clear to remove children without destroying parent
+- Delete removes and destroys specific children
+
+```pascal
+var
+  Root: TNode<String>;
+begin
+  Root := TNode<String>.Create;
+  try
+    Root.Add('A');
+    Root.Add('B');
+    Root.Add('C');
+    
+    Root.Delete(1);     // Removes 'B', now has 'A' and 'C'
+    Root.Clear;         // Removes all children
+    ShowMessage(IntToStr(Root.Count));  // 0
+  finally
+    Root.Free;         // Safe even if already cleared
+  end;
+end;
+```

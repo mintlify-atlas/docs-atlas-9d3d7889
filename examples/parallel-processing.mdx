@@ -1,0 +1,465 @@
+---
+title: Parallel Processing
+description: Multi-threaded query execution for high-performance data processing
+---
+
+TeeBI supports parallel query execution to leverage multi-core processors for faster data processing.
+
+## Basic Parallel Query
+
+```pascal
+uses
+  System.Threading, System.Diagnostics, BI.SQL;
+
+{$IF CompilerVersion > 27}  // Requires RAD Studio XE7 or later
+procedure ParallelQuery;
+var
+  Data: TDataItem;
+  Results: array[0..3] of TDataItem;
+  Stopwatch: TStopwatch;
+begin
+  Data := TStore.Load('BISamples', 'Products');
+  try
+    Stopwatch := TStopwatch.StartNew;
+
+    // Execute 4 queries in parallel on separate CPU cores
+    TParallel.For(0, 3,
+      procedure(Index: Integer)
+      begin
+        case Index of
+          0: Results[0] := TBISQL.From(Data, 'sum(Stock) group by Category');
+          1: Results[1] := TBISQL.From(Data, 'avg(UnitPrice) group by Category');
+          2: Results[2] := TBISQL.From(Data, 'count(*) group by Category');
+          3: Results[3] := TBISQL.From(Data, 'max(UnitPrice) group by Category');
+        end;
+      end
+    );
+
+    ShowMessage(Format('Completed 4 queries in %d ms using %d cores',
+      [Stopwatch.ElapsedMilliseconds, TThread.ProcessorCount]));
+
+    // Use results...
+    BIGrid1.Data := Results[0];
+
+    // Cleanup
+    for var I := 1 to 3 do
+      Results[I].Free;
+  finally
+    Data.Free;
+  end;
+end;
+{$ENDIF}
+```
+
+## Benchmark: Serial vs Parallel
+
+```pascal
+uses
+  System.Threading, System.Diagnostics, BI.SQL;
+
+{$IF CompilerVersion > 27}
+procedure CompareSerialVsParallel;
+const
+  QueryCount = 100;
+var
+  Data: TDataItem;
+  I: Integer;
+  SerialTime, ParallelTime: Int64;
+  Stopwatch: TStopwatch;
+begin
+  Data := TStore.Load('BISamples', 'Products');
+  try
+    // Serial execution
+    Stopwatch := TStopwatch.StartNew;
+    for I := 0 to QueryCount - 1 do
+    begin
+      var Result := TBISQL.From(Data, 'sum(Stock) group by Category');
+      Result.Free;
+    end;
+    SerialTime := Stopwatch.ElapsedMilliseconds;
+
+    // Parallel execution
+    Stopwatch := TStopwatch.StartNew;
+    TParallel.For(0, QueryCount - 1,
+      procedure(Index: Integer)
+      var Result: TDataItem;
+      begin
+        Result := TBISQL.From(Data, 'sum(Stock) group by Category');
+        Result.Free;
+      end
+    );
+    ParallelTime := Stopwatch.ElapsedMilliseconds;
+
+    ShowMessage(Format(
+      'Serial: %d ms' + sLineBreak +
+      'Parallel: %d ms' + sLineBreak +
+      'Speedup: %.2fx',
+      [SerialTime, ParallelTime, SerialTime / ParallelTime]));
+  finally
+    Data.Free;
+  end;
+end;
+{$ENDIF}
+```
+
+## Parallel Data Processing
+
+```pascal
+uses System.Threading;
+
+{$IF CompilerVersion > 27}
+// Process large dataset in parallel chunks
+procedure ProcessDataParallel;
+var
+  Data: TDataItem;
+  Results: TArray<Double>;
+begin
+  Data := CreateLargeDataset(10000000);  // 10 million rows
+  try
+    SetLength(Results, Data.Count);
+
+    // Process each row in parallel
+    TParallel.For(0, Data.Count - 1,
+      procedure(Index: Integer)
+      begin
+        // Custom calculation per row
+        Results[Index] := Sqrt(Data['Value1'].DoubleData[Index] * 
+                              Data['Value2'].DoubleData[Index]);
+      end
+    );
+
+    ShowMessage('Processed ' + IntToStr(Data.Count) + ' rows in parallel');
+  finally
+    Data.Free;
+  end;
+end;
+{$ENDIF}
+```
+
+## Multi-threaded Benchmarks
+
+```pascal
+uses
+  BI.SQL, System.Threading, System.Diagnostics;
+
+{$IF CompilerVersion > 27}
+type
+  TQueryBenchmark = class
+  private
+    FData: TDataItem;
+    FResults: TDataItem;
+  public
+    constructor Create(const AData: TDataItem);
+    destructor Destroy; override;
+    
+    function BenchmarkSingleThread(Iterations: Integer): Int64;
+    function BenchmarkMultiThread(Iterations: Integer): Int64;
+    function RunAll: TDataItem;
+  end;
+
+constructor TQueryBenchmark.Create(const AData: TDataItem);
+begin
+  inherited Create;
+  FData := AData;
+  
+  // Create results table
+  FResults := TDataItem.Create(True);
+  FResults.Items.Add('Test', TDataKind.dkText);
+  FResults.Items.Add('Time (ms)', TDataKind.dkInt64);
+  FResults.Items.Add('Per Second', TDataKind.dkInt32);
+end;
+
+destructor TQueryBenchmark.Destroy;
+begin
+  FResults.Free;
+  inherited;
+end;
+
+function TQueryBenchmark.BenchmarkSingleThread(Iterations: Integer): Int64;
+var
+  Stopwatch: TStopwatch;
+  I: Integer;
+  Result: TDataItem;
+begin
+  Stopwatch := TStopwatch.StartNew;
+  
+  for I := 1 to Iterations do
+  begin
+    Result := TBISQL.From(FData, 'sum(Stock) group by Category');
+    Result.Free;
+  end;
+  
+  Result := Stopwatch.ElapsedMilliseconds;
+end;
+
+function TQueryBenchmark.BenchmarkMultiThread(Iterations: Integer): Int64;
+var
+  Stopwatch: TStopwatch;
+begin
+  Stopwatch := TStopwatch.StartNew;
+  
+  TParallel.For(0, Iterations - 1,
+    procedure(Index: Integer)
+    var Res: TDataItem;
+    begin
+      Res := TBISQL.From(FData, 'sum(Stock) group by Category');
+      Res.Free;
+    end
+  );
+  
+  Result := Stopwatch.ElapsedMilliseconds;
+end;
+
+function TQueryBenchmark.RunAll: TDataItem;
+const
+  Iterations = 1000;
+var
+  SingleTime, MultiTime: Int64;
+begin
+  FResults.Resize(2);
+  
+  // Single-threaded
+  SingleTime := BenchmarkSingleThread(Iterations);
+  FResults['Test'].TextData[0] := 'Single Thread';
+  FResults['Time (ms)'].Int64Data[0] := SingleTime;
+  FResults['Per Second'].Int32Data[0] := Round(1000 * Iterations / SingleTime);
+  
+  // Multi-threaded
+  MultiTime := BenchmarkMultiThread(Iterations);
+  FResults['Test'].TextData[1] := 'Multi Thread (' + 
+    IntToStr(TThread.ProcessorCount) + ' cores)';
+  FResults['Time (ms)'].Int64Data[1] := MultiTime;
+  FResults['Per Second'].Int32Data[1] := Round(1000 * Iterations / MultiTime);
+  
+  Result := FResults;
+end;
+{$ENDIF}
+```
+
+## Thread-Safe Data Access
+
+```pascal
+uses System.SyncObjs, System.Threading;
+
+{$IF CompilerVersion > 27}
+type
+  TThreadSafeProcessor = class
+  private
+    FData: TDataItem;
+    FLock: TCriticalSection;
+  public
+    constructor Create(const AData: TDataItem);
+    destructor Destroy; override;
+    
+    procedure ProcessInParallel;
+  end;
+
+constructor TThreadSafeProcessor.Create(const AData: TDataItem);
+begin
+  inherited Create;
+  FData := AData;
+  FLock := TCriticalSection.Create;
+end;
+
+destructor TThreadSafeProcessor.Destroy;
+begin
+  FLock.Free;
+  inherited;
+end;
+
+procedure TThreadSafeProcessor.ProcessInParallel;
+var
+  Counter: Integer;
+begin
+  Counter := 0;
+  
+  TParallel.For(0, FData.Count - 1,
+    procedure(Index: Integer)
+    begin
+      // Process data (read-only operations don't need locking)
+      var Value := FData['Amount'].DoubleData[Index];
+      
+      // Shared counter needs synchronization
+      FLock.Enter;
+      try
+        Inc(Counter);
+      finally
+        FLock.Leave;
+      end;
+    end
+  );
+  
+  ShowMessage('Processed: ' + IntToStr(Counter));
+end;
+{$ENDIF}
+```
+
+## Parallel Aggregation
+
+```pascal
+uses System.Threading;
+
+{$IF CompilerVersion > 27}
+// Parallel sum calculation
+function ParallelSum(const Data: TDataItem; const ColumnName: String): Double;
+var
+  PartialSums: TArray<Double>;
+  ThreadCount: Integer;
+begin
+  ThreadCount := TThread.ProcessorCount;
+  SetLength(PartialSums, ThreadCount);
+  
+  // Calculate partial sums in parallel
+  TParallel.For(0, ThreadCount - 1,
+    procedure(ThreadIndex: Integer)
+    var
+      StartRow, EndRow, I: Integer;
+      Sum: Double;
+    begin
+      StartRow := (Data.Count * ThreadIndex) div ThreadCount;
+      EndRow := (Data.Count * (ThreadIndex + 1)) div ThreadCount - 1;
+      
+      Sum := 0;
+      for I := StartRow to EndRow do
+        Sum := Sum + Data[ColumnName].DoubleData[I];
+      
+      PartialSums[ThreadIndex] := Sum;
+    end
+  );
+  
+  // Combine partial results
+  Result := 0;
+  for var Sum in PartialSums do
+    Result := Result + Sum;
+end;
+{$ENDIF}
+```
+
+## Complete Example: Parallel Speed Test
+
+```pascal
+uses
+  BI.DataItem, BI.Persist, BI.SQL,
+  VCLBI.Grid, System.Threading, System.Diagnostics;
+
+type
+  TParallelSpeedForm = class(TForm)
+    BIGrid1: TBIGrid;
+    BtnRunTest: TButton;
+    CheckBoxParallel: TCheckBox;
+    LabelTime: TLabel;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure BtnRunTestClick(Sender: TObject);
+  private
+    Data: TDataItem;
+    SpeedTest: TBISpeedTest;
+  end;
+
+procedure TParallelSpeedForm.FormCreate(Sender: TObject);
+begin
+  // Load test data
+  Data := TStore.Load('BISamples', 'Products');
+  
+  // Create speed test
+  SpeedTest := TBISpeedTest.Create;
+  BIGrid1.Data := SpeedTest.Results;
+end;
+
+procedure TParallelSpeedForm.BtnRunTestClick(Sender: TObject);
+var
+  Stopwatch: TStopwatch;
+begin
+  Screen.Cursor := crHourGlass;
+  try
+    SpeedTest.Clear;
+    SpeedTest.Parallel_SQL := CheckBoxParallel.Checked;
+    
+    Stopwatch := TStopwatch.StartNew;
+    SpeedTest.Run;
+    
+    LabelTime.Caption := 'Total: ' + 
+      IntToStr(Stopwatch.ElapsedMilliseconds) + ' ms';
+    
+    BIGrid1.RefreshData;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+end;
+
+procedure TParallelSpeedForm.FormDestroy(Sender: TObject);
+begin
+  SpeedTest.Free;
+  Data.Free;
+end;
+```
+
+## Platform Requirements
+
+<Note>
+  Parallel processing features require:
+  - RAD Studio XE7 or later (System.Threading unit)
+  - Multi-core processor for performance benefits
+  - Sufficient memory for concurrent operations
+</Note>
+
+## Performance Considerations
+
+<AccordionGroup>
+  <Accordion title="Thread Overhead">
+    Don't use parallel processing for:
+    - Small datasets (< 10,000 rows)
+    - Fast operations (< 10ms per query)
+    - Memory-bound operations
+    
+    Thread creation overhead may exceed benefits.
+  </Accordion>
+  
+  <Accordion title="Memory Usage">
+    Each thread needs its own memory:
+    ```pascal
+    // Each thread creates temporary data
+    TParallel.For(0, 99,
+      procedure(I: Integer)
+      var Temp: TDataItem;  // 100 temporary datasets!
+      begin
+        Temp := TBISQL.From(Data, 'sum(*) group by Category');
+        Temp.Free;
+      end
+    );
+    ```
+  </Accordion>
+  
+  <Accordion title="Optimal Thread Count">
+    ```pascal
+    // Usually optimal = CPU core count
+    var OptimalThreads := TThread.ProcessorCount;
+    
+    // For I/O operations, can use more
+    var IOThreads := TThread.ProcessorCount * 2;
+    ```
+  </Accordion>
+  
+  <Accordion title="Read-Only Operations">
+    TeeBI data is thread-safe for concurrent reads:
+    - Multiple threads can query same data
+    - No locking needed for read operations
+    - Write operations need synchronization
+  </Accordion>
+</AccordionGroup>
+
+## Scaling Guidelines
+
+| Dataset Size | Parallel Benefit | Recommendation |
+|-------------|------------------|----------------|
+| < 10K rows | Minimal | Use single thread |
+| 10K - 100K | Moderate | Test both |
+| 100K - 1M | Good | Use parallel |
+| > 1M rows | Excellent | Always parallel |
+
+## See Also
+
+- [Big Data](/examples/big-data) - Work with large datasets
+- [SQL Queries](/examples/sql-queries) - Query optimization
+- [Group By](/examples/group-by) - Parallel aggregation
+- [Simple Queries](/examples/simple-queries) - Basic operations

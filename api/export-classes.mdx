@@ -1,0 +1,271 @@
+---
+title: Export Classes
+description: Classes for exporting TeeBI data to various formats
+---
+
+## Overview
+
+TeeBI provides export classes for converting TDataItem structures to different file formats. All export classes inherit from `TBITextExport` or `TBIExport`.
+
+Location: `BI.Persist.pas`
+
+## Base Export Classes
+
+### TBIExport
+
+Abstract base class for all exporters.
+
+```pascal
+type
+  TBIExport = class
+  public
+    Data: TDataItem;      // Data to export
+    SchemaOnly: Boolean;  // Export structure only, no data
+    
+    function AsString: String;  // Export to string
+    procedure SaveToFile(const FileName: String);  // Export to file
+  end;
+```
+
+### TBITextExport
+
+Base class for text-based formats (CSV, JSON, XML).
+
+```pascal
+type
+  TBITextExport = class(TBIExport)
+  protected
+    procedure DoEmit(const AItems: TStrings); virtual; abstract;
+  end;
+```
+
+## Available Export Formats
+
+### CSV Export - TBICSVExport
+
+See [TBICSV](/api/tbicsv#tbicsvexport) for details.
+
+```pascal
+var
+  Export: TBICSVExport;
+begin
+  Export := TBICSVExport.Create;
+  try
+    Export.Data := MyData;
+    Export.Delimiter := ',';
+    Export.Header := True;
+    Export.SaveToFile('output.csv');
+  finally
+    Export.Free;
+  end;
+end;
+```
+
+### JSON Export - TBIJSONExport
+
+See [TBIJSON](/api/tbijson#export-to-json) for details.
+
+```pascal
+var
+  Export: TBIJSONExport;
+begin
+  Export := TBIJSONExport.Create;
+  try
+    Export.Data := MyData;
+    Export.Header := True;
+    Export.SaveToFile('output.json');
+  finally
+    Export.Free;
+  end;
+end;
+```
+
+### XML Export - TBIXMLExport
+
+See [TBIXML](/api/tbixml#export-to-xml) for details.
+
+```pascal
+var
+  Export: TBIXMLExport;
+begin
+  Export := TBIXMLExport.Create;
+  try
+    Export.Data := MyData;
+    Export.Emit := TBIXMLEmit.Header;
+    Export.SaveToFile('output.xml');
+  finally
+    Export.Free;
+  end;
+end;
+```
+
+## Common Export Patterns
+
+### Export to String
+
+```pascal
+var
+  CSV: TBICSVExport;
+  Text: String;
+begin
+  CSV := TBICSVExport.Create;
+  try
+    CSV.Data := MyData;
+    Text := CSV.AsString;  // Get as string instead of file
+    Memo1.Text := Text;
+  finally
+    CSV.Free;
+  end;
+end;
+```
+
+### Schema-Only Export
+
+```pascal
+var
+  JSON: TBIJSONExport;
+begin
+  JSON := TBIJSONExport.Create;
+  try
+    JSON.Data := MyData;
+    JSON.SchemaOnly := True;  // Export structure only
+    JSON.SaveToFile('schema.json');
+  finally
+    JSON.Free;
+  end;
+end;
+```
+
+### Export with Progress
+
+```pascal
+procedure TForm1.ExportWithProgress(const Data: TDataItem);
+var
+  Export: TBICSVExport;
+begin
+  Export := TBICSVExport.Create;
+  try
+    Export.Data := Data;
+    Export.OnProgress := 
+      procedure(Sender: TObject; Percent: Single; var Cancel: Boolean)
+      begin
+        ProgressBar1.Position := Round(Percent);
+        Application.ProcessMessages;
+        Cancel := FCancelExport;  // User can cancel
+      end;
+    
+    Export.SaveToFile('large_file.csv');
+  finally
+    Export.Free;
+  end;
+end;
+```
+
+## Native TeeBI Formats
+
+### Binary Export - TPersistence
+
+Fast binary format for TeeBI data.
+
+```pascal
+TPersistence.Save(MyData, 'data.bi');
+```
+
+### Data + Structure - TDataItemPersistence
+
+Saves both data and structure in one file.
+
+```pascal
+TDataItemPersistence.Save(MyData, 'complete.bidata');
+```
+
+### Separate Files - TDataPersistence
+
+Structure and data in separate files.
+
+```pascal
+// Save structure
+TPersistence.Save(MyData, 'schema.bi');
+
+// Save data
+TDataPersistence.Save(MyData, 'data.databi');
+```
+
+## Export Helper Functions
+
+### Quick Export Methods
+
+```pascal
+// From TBITextExport
+class procedure SaveToFile(const Text, FileName: String);
+
+// Usage
+TBICSVExport.SaveToFile(MyCSVText, 'output.csv');
+```
+
+### File Filters
+
+Get file dialog filters:
+
+```pascal
+var
+  Filters: TFileFilters;
+begin
+  Filters := TBICSVExport.FileFilter;
+  // Returns: 'CSV (Comma separated values)|*.csv|TSV (Tab separated values)|*.tsv'
+  
+  OpenDialog1.Filter := Filters.AsString;
+end;
+```
+
+## Creating Custom Exporters
+
+Inherit from TBITextExport:
+
+```pascal
+type
+  TMyExporter = class(TBITextExport)
+  protected
+    procedure DoEmit(const AItems: TStrings); override;
+  public
+    class function FileFilter: TFileFilters; override;
+    class function Supports(const Extension: String): Boolean; override;
+  end;
+
+implementation
+
+procedure TMyExporter.DoEmit(const AItems: TStrings);
+var
+  i: Integer;
+begin
+  // Custom export logic
+  for i := 0 to Data.Count - 1 do
+  begin
+    AItems.Add(Data.Items[0].TextData[i]);
+  end;
+end;
+
+class function TMyExporter.FileFilter: TFileFilters;
+begin
+  Result := nil;
+  Result.Add('My Format', '*.myf');
+end;
+
+class function TMyExporter.Supports(const Extension: String): Boolean;
+begin
+  Result := SameText(Extension, '.myf');
+end;
+```
+
+## Export Registry
+
+Register your exporter:
+
+```pascal
+initialization
+  TBIExporters.RegisterClass(TMyExporter);
+  
+finalization
+  TBIExporters.UnRegisterClass(TMyExporter);
+end.
+```

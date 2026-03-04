@@ -1,0 +1,304 @@
+---
+title: SQL Queries
+description: Advanced SQL query features including joins, aggregates, and sub-queries
+---
+
+TeeBI implements a powerful SQL query engine with support for complex operations.
+
+## Basic SQL Syntax
+
+```pascal
+uses BI.SQL;
+
+var Result: TDataItem;
+
+// Standard SELECT
+Result := TBISQL.From(Data, 
+  'select ProductName, UnitPrice from Products');
+
+// The 'select' and 'from' keywords are optional
+Result := TBISQL.From(Products, 'ProductName, UnitPrice');
+```
+
+## Joins
+
+```pascal
+// Master-detail relationships are automatic
+// Access detail tables using dot notation
+Result := TBISQL.From(Orders,
+  'OrderID, OrderDate, Customers.CompanyName, Customers.Country');
+
+// Filter on related table
+Result := TBISQL.From(Orders,
+  'OrderID where Customers.Country = "USA"');
+
+// Multiple levels of relationships
+Result := TBISQL.From(OrderDetails,
+  'OrderID, Products.ProductName, Products.Suppliers.CompanyName');
+```
+
+## Sub-Queries
+
+```pascal
+// In WHERE clause
+Result := TBISQL.From(Products,
+  'ProductName, UnitPrice where UnitPrice > select avg(UnitPrice)');
+
+// In SELECT clause
+Result := TBISQL.From(Products,
+  'ProductName, UnitPrice, (select avg(UnitPrice)) as AvgPrice');
+
+// Correlated sub-query
+Result := TBISQL.From(Products,
+  'ProductName, UnitPrice where UnitPrice > ' +
+  '  (select avg(UnitPrice) where Category = Products.Category)');
+```
+
+## HAVING Clause
+
+```pascal
+// Filter aggregated results
+Result := TBISQL.From(Products,
+  'Category, sum(Stock) group by Category having sum(Stock) > 100');
+
+// Multiple HAVING conditions
+Result := TBISQL.From(Orders,
+  'CustomerID, sum(TotalAmount), count(*) ' +
+  'group by CustomerID ' +
+  'having sum(TotalAmount) > 10000 and count(*) > 5');
+```
+
+## CASE Expressions
+
+```pascal
+// Simple CASE
+Result := TBISQL.From(Products,
+  'ProductName, ' +
+  'case when UnitPrice < 10 then "Cheap" ' +
+  '     when UnitPrice < 50 then "Medium" ' +
+  '     else "Expensive" end as PriceRange');
+
+// CASE in aggregation
+Result := TBISQL.From(Products,
+  'Category, ' +
+  'sum(case when Stock > 0 then 1 else 0 end) as InStock, ' +
+  'sum(case when Stock = 0 then 1 else 0 end) as OutOfStock ' +
+  'group by Category');
+```
+
+## Complete Example: Sales Analysis
+
+```pascal
+uses
+  BI.DataItem, BI.SQL, BI.Persist,
+  VCLBI.Grid, VCLBI.Chart;
+
+type
+  TAnalysisForm = class(TForm)
+    BIGrid1: TBIGrid;
+    BIChart1: TBIChart;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+  private
+    Demo: TDataItem;
+  end;
+
+procedure TAnalysisForm.FormCreate(Sender: TObject);
+var
+  Query: String;
+  Result: TDataItem;
+begin
+  // Load database
+  Demo := TStore.Load('SQLite_Demo');
+
+  // Complex sales analysis query
+  Query :=
+    'select ' +
+    '  Products.Category, ' +
+    '  year(Orders.OrderDate) as Year, ' +
+    '  sum("Order Details".Quantity * "Order Details".UnitPrice) as Revenue, ' +
+    '  sum("Order Details".Quantity) as TotalQuantity, ' +
+    '  count(distinct Orders.OrderID) as OrderCount, ' +
+    '  avg("Order Details".UnitPrice) as AvgPrice ' +
+    'where ' +
+    '  year(Orders.OrderDate) >= 2020 ' +
+    '  and Products.Category in ("Beverages", "Confections", "Dairy Products") ' +
+    'group by ' +
+    '  Products.Category, year(Orders.OrderDate) ' +
+    'having ' +
+    '  sum("Order Details".Quantity * "Order Details".UnitPrice) > 5000 ' +
+    'order by ' +
+    '  Year desc, Revenue desc';
+
+  // Execute query
+  Result := TBISQL.From(Demo, Query);
+
+  // Display results
+  BIGrid1.Data := Result;
+  BIChart1.Data := Result;
+end;
+
+procedure TAnalysisForm.FormDestroy(Sender: TObject);
+begin
+  BIGrid1.Data.Free;
+  Demo.Free;
+end;
+```
+
+## Query Verification
+
+```pascal
+uses BI.SQL, BI.Expression;
+
+function ParseAndVerify(const Data: TDataItem; const SQL: String): Boolean;
+var
+  Parser: TSQLParser;
+  ErrorMsg: String;
+begin
+  Result := True;
+  ErrorMsg := '';
+
+  Parser := TSQLParser.Create(Data, SQL);
+  try
+    Parser.Parse(
+      function(const Sender: TObject; const Error: String): Boolean
+      begin
+        ErrorMsg := Error;
+        Result := True;  // Handle error
+      end
+    );
+
+    if ErrorMsg <> '' then
+    begin
+      ShowMessage('SQL Error: ' + ErrorMsg);
+      Result := False;
+    end;
+  finally
+    Parser.Free;
+  end;
+end;
+```
+
+## Query Benchmarking
+
+```pascal
+uses System.Diagnostics;
+
+procedure BenchmarkQuery;
+const
+  Iterations = 1000;
+var
+  Stopwatch: TStopwatch;
+  I: Integer;
+  Result: TDataItem;
+begin
+  Stopwatch := TStopwatch.StartNew;
+
+  for I := 1 to Iterations do
+  begin
+    Result := TBISQL.From(Data, 'sum(Amount) group by Category');
+    Result.Free;
+  end;
+
+  ShowMessage(Format('Time: %d ms (%d per second)',
+    [Stopwatch.ElapsedMilliseconds,
+     Round(1000 * Iterations / Stopwatch.ElapsedMilliseconds)]));
+end;
+```
+
+## Parallel Query Execution
+
+```pascal
+uses System.Threading;
+
+{$IF CompilerVersion > 27}  // XE7 and up
+procedure RunQueriesInParallel;
+var
+  Results: array[0..3] of TDataItem;
+begin
+  TParallel.For(0, 3,
+    procedure(Index: Integer)
+    begin
+      case Index of
+        0: Results[0] := TBISQL.From(Data, 'sum(Sales) group by Region');
+        1: Results[1] := TBISQL.From(Data, 'count(*) group by Product');
+        2: Results[2] := TBISQL.From(Data, 'avg(Price) group by Category');
+        3: Results[3] := TBISQL.From(Data, 'sum(Quantity) group by Year');
+      end;
+    end
+  );
+
+  // Use results...
+  
+  // Free results
+  Results[0].Free;
+  Results[1].Free;
+  Results[2].Free;
+  Results[3].Free;
+end;
+{$ENDIF}
+```
+
+## Converting Summary to SQL
+
+```pascal
+uses BI.Summary;
+
+var
+  Summary: TSummary;
+  SQL: String;
+begin
+  // Create a summary
+  Summary := TSummary.Create(Self);
+  try
+    Summary.Data := Products;
+    Summary.Measures.Add(Products['Stock']).Aggregate := agSum;
+    Summary.By.Add(Products['Category']);
+
+    // Convert to SQL string
+    SQL := TBISQL.From(Summary);
+    // Result: 'sum(Stock) group by Category'
+
+    ShowMessage(SQL);
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+## Query with Custom Functions
+
+See [Expressions](/examples/expressions) for custom function examples.
+
+## Performance Tips
+
+<CardGroup cols={2}>
+  <Card title="Filter Early" icon="filter">
+    Use WHERE clauses to reduce data before aggregation
+  </Card>
+  <Card title="Index Columns" icon="bolt">
+    Create indexes on columns used in WHERE and JOIN
+  </Card>
+  <Card title="Limit Results" icon="list">
+    Use TOP and OFFSET for large result sets
+  </Card>
+  <Card title="Parallel Processing" icon="diagram-project">
+    Enable multi-CPU execution for multiple queries
+  </Card>
+</CardGroup>
+
+## Error Messages
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| "Unknown column" | Column name not found | Check spelling, use correct table reference |
+| "Syntax error" | Invalid SQL syntax | Verify query structure |
+| "Aggregate required" | Non-aggregated column in GROUP BY | Add column to GROUP BY or use aggregate |
+| "Type mismatch" | Incompatible data types | Cast values or check data types |
+
+## See Also
+
+- [Simple Queries](/examples/simple-queries) - Basic query operations
+- [Group By](/examples/group-by) - Aggregation examples
+- [Expressions](/examples/expressions) - Custom calculations
+- [Filters](/examples/filters) - Advanced filtering

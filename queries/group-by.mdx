@@ -1,0 +1,401 @@
+---
+title: 'GROUP BY Queries'
+description: 'Creating grouped summaries and multi-dimensional queries'
+---
+
+TeeBI's GROUP BY functionality enables powerful data summarization and multi-dimensional analysis.
+
+## Basic GROUP BY
+
+### Simple Grouping
+
+```pascal
+// Group sales by country
+Result := TBISQL.From(Data, 'sum(Sales) group by Country');
+
+// Multiple measures
+Result := TBISQL.From(Data, 
+  'sum(Sales), count(*), average(Price) group by Country');
+```
+
+### Multiple Dimensions
+
+```pascal
+// Group by multiple columns
+Result := TBISQL.From(Data, 
+  'sum(Amount) group by Country, Year');
+
+// Three dimensions
+Result := TBISQL.From(Data,
+  'sum(Sales) group by Country, Region, Product');
+```
+
+## TSummary Class
+
+Programmatic summary creation. See [BI.Summary.pas:402](/queries/group-by#tsummary).
+
+```pascal
+var
+  Summary: TSummary;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    // Add measure (aggregation)
+    Summary.Measures.Add(MyData['Sales'], TAggregate.Sum);
+    
+    // Add dimension (group by)
+    Summary.By.Add(MyData['Country']);
+    Summary.By.Add(MyData['Year']);
+    
+    // Execute
+    Result := Summary.Calculate;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+## TGroupBy Class
+
+Defines a grouping dimension. See [BI.Summary.pas:274](/queries/group-by#tgroupby).
+
+### Properties
+
+- `Data` - The TDataItem to group by
+- `Expression` - Optional expression instead of data field
+- `DatePart` - Date/time part for temporal grouping
+- `Histogram` - Numeric range grouping
+- `Layout` - Row or column orientation
+
+### Example
+
+```pascal
+var
+  GroupBy: TGroupBy;
+begin
+  GroupBy := Summary.By.Add(MyData['Country']);
+  GroupBy.Layout := TGroupByLayout.Rows;
+end;
+```
+
+## DateTime Grouping
+
+Group by date/time parts:
+
+```pascal
+// Group by year
+Result := TBISQL.From(Data, 'sum(Sales) group by Year(OrderDate)');
+
+// Group by month
+Result := TBISQL.From(Data, 'sum(Sales) group by Month(OrderDate)');
+
+// Group by quarter
+Result := TBISQL.From(Data, 'sum(Sales) group by Quarter(OrderDate)');
+
+// Multiple date parts
+Result := TBISQL.From(Data, 
+  'sum(Sales) group by Year(OrderDate), Month(OrderDate)');
+```
+
+### Supported Date/Time Parts
+
+From [BI.Expression.pas:401](/queries/group-by#datetime-parts):
+
+**Time Parts**:
+- `Millisecond`, `HundredsOfSecond`, `TenthsOfSecond`
+- `Second`, `Minute`, `QuarterHour`, `Hour`
+
+**Date Parts**:
+- `DayOfMonth`, `DayOfYear`, `WeekOfYear`, `WeekDay`
+- `Month`, `Quarter`, `Year`
+- `Decade`, `DecadeOfYear`, `Century`, `Millennium`
+
+**Name Parts**:
+- `ShortWeekDayName`, `LongWeekDayName`
+- `ShortMonthName`, `LongMonthName`
+
+### Programmatic Date Grouping
+
+```pascal
+var
+  GroupBy: TGroupBy;
+begin
+  GroupBy := Summary.By.Add(MyData['OrderDate']);
+  GroupBy.DatePart := TDateTimePart.Year;
+end;
+```
+
+## Histogram Grouping
+
+Group numeric values into ranges:
+
+```pascal
+var
+  Summary: TSummary;
+  GroupBy: TGroupBy;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    Summary.Measures.Add(MyData['CustomerID'], TAggregate.Count);
+    
+    GroupBy := Summary.By.Add(MyData['Price']);
+    
+    // Configure histogram
+    GroupBy.Histogram.Active := True;
+    GroupBy.Histogram.NumBins := 10;        // 10 ranges
+    GroupBy.Histogram.BinSize := 100;       // Range size
+    GroupBy.Histogram.Minimum := 0;         // Start
+    GroupBy.Histogram.Maximum := 1000;      // End
+    
+    Result := Summary.Calculate;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+See [THistogram](/queries/group-by#histogram) at BI.Summary.pas:42.
+
+### Histogram Properties
+
+- `Active` - Enable histogram grouping
+- `NumBins` - Number of ranges (default: auto)
+- `BinSize` - Size of each range
+- `Minimum` - Start value (default: auto)
+- `Maximum` - End value (default: auto)
+- `AutoMinimum` - Auto-detect minimum
+- `AutoMaximum` - Auto-detect maximum
+- `FloatFormat` - Format string for bin labels
+
+## Expression Grouping
+
+Group by calculated expressions:
+
+```pascal
+// Group by expression
+Result := TBISQL.From(Data, 
+  'sum(Sales) group by (Price * Quantity)');
+
+// Text function
+Result := TBISQL.From(Data,
+  'sum(Sales) group by upper(Country)');
+```
+
+### Programmatic Expression Grouping
+
+```pascal
+var
+  Summary: TSummary;
+  Expr: TExpression;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    // Create expression
+    Expr := TArithmeticExpression.Create(
+      TDataItemExpression.Create(MyData['Price']),
+      TArithmeticOperand.Multiply,
+      TDataItemExpression.Create(MyData['Quantity'])
+    );
+    
+    Summary.By.Add(Expr);
+    Summary.Measures.Add(MyData['OrderID'], TAggregate.Count);
+    
+    Result := Summary.Calculate;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+## Multi-Dimensional Layout
+
+Control row vs column orientation:
+
+```pascal
+var
+  Summary: TSummary;
+  Country, Year: TGroupBy;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    Summary.Measures.Add(MyData['Sales'], TAggregate.Sum);
+    
+    // Country as rows
+    Country := Summary.By.Add(MyData['Country']);
+    Country.Layout := TGroupByLayout.Rows;
+    
+    // Year as columns
+    Year := Summary.By.Add(MyData['Year']);
+    Year.Layout := TGroupByLayout.Items; // Columns
+    
+    Result := Summary.Calculate;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+See [TGroupByLayout](/queries/group-by#layout) at BI.Summary.pas:271.
+
+### Layout Options
+
+- `TGroupByLayout.Automatic` - Auto-detect (default)
+- `TGroupByLayout.Rows` - Place in rows
+- `TGroupByLayout.Items` - Place in columns
+
+## Filtering Groups
+
+Combine GROUP BY with WHERE:
+
+```pascal
+// Filter before grouping
+Result := TBISQL.From(Data,
+  'sum(Sales) where Country="USA" group by State');
+
+// Multiple filters
+Result := TBISQL.From(Data,
+  'sum(Amount) where (Customer=123) and (Product<456) group by Country, Year');
+```
+
+## Having Clause
+
+Filter after aggregation:
+
+```pascal
+var
+  Summary: TSummary;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    Summary.Measures.Add(MyData['Sales'], TAggregate.Sum);
+    Summary.By.Add(MyData['Country']);
+    
+    // Filter aggregated results
+    Summary.Having.Add('sum(Sales) > 10000');
+    
+    Result := Summary.Calculate;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+See [TSummary.Having](/queries/aggregations#having) at BI.Summary.pas:467.
+
+## Sorting Grouped Results
+
+```pascal
+// Sort by dimension
+Result := TBISQL.From(Data,
+  'sum(Sales) group by Country order by Country');
+
+// Sort by measure
+Result := TBISQL.From(Data,
+  'sum(Sales) group by Country order by sum(Sales) desc');
+```
+
+## Remove Missing Values
+
+Eliminate empty rows/columns:
+
+```pascal
+var
+  Summary: TSummary;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    Summary.Measures.Add(MyData['Sales'], TAggregate.Sum);
+    Summary.By.Add(MyData['Country']);
+    Summary.By.Add(MyData['Product']);
+    
+    // Remove empty rows and columns
+    Summary.RemoveMissing.Rows := True;
+    Summary.RemoveMissing.Columns := True;
+    
+    Result := Summary.Calculate;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+See [TRemoveMissing](/queries/group-by#remove-missing) at BI.Summary.pas:384.
+
+## TBIQuery Component
+
+Component-based grouping. See [BI.Query.pas:250](/queries/group-by#tbiquery).
+
+```pascal
+var
+  Query: TBIQuery;
+  Dimension: TQueryDimension;
+  Measure: TQueryMeasure;
+begin
+  Query := TBIQuery.Create(nil);
+  try
+    Query.Data := MyData;
+    
+    // Add dimension
+    Dimension := Query.Dimensions.Add(MyData['Country']);
+    
+    // Add measure
+    Measure := Query.Measures.Add(
+      MyData['Sales'], 
+      TAggregate.Sum
+    );
+    
+    // Auto-creates TSummary
+    Result := Query.Calculate;
+  finally
+    Query.Free;
+  end;
+end;
+```
+
+### Query Style Detection
+
+TBIQuery automatically determines query style:
+
+- **Select** - No measures, dimensions only
+- **Summary** - Has measures, creates TSummary
+
+See [TBIQuery.Style](/queries/group-by#style) at BI.Query.pas:291.
+
+## Performance Considerations
+
+### Optimize Grouping
+
+1. **Filter first** - Apply WHERE before GROUP BY
+2. **Limit dimensions** - Fewer dimensions = faster
+3. **Use appropriate types** - Integer grouping faster than text
+
+```pascal
+// Efficient: Filter then group
+Result := TBISQL.From(Data,
+  'sum(Sales) where Year=2024 group by Country');
+
+// Less efficient: Group all data
+Result := TBISQL.From(Data,
+  'sum(Sales) group by Country, Year');
+```
+
+### Memory Usage
+
+Grouped results size depends on:
+- Number of unique group combinations
+- Number of measures
+- Data types used
+
+Large cardinality dimensions (like CustomerID) can create many groups.
+
+## Redundant Groups
+
+TeeBI removes redundant grouping dimensions:
+
+```pascal
+// If Country.Master = State, State grouping is redundant
+Summary.By.Add(MyData['Country']);
+Summary.By.Add(MyData['State']); // Automatically removed
+```
+
+See [TGroupBys.RemoveRedundant](/queries/group-by#redundant) at BI.Summary.pas:1157.

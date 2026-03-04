@@ -1,0 +1,509 @@
+---
+title: TSummary
+description: Perform data aggregation, grouping, and pivot table operations
+---
+
+TSummary is the core class for performing aggregations and creating pivot tables in TeeBI. It provides group-by functionality with multiple dimensions and measures.
+
+## Overview
+
+TSummary enables:
+- **Aggregation**: Sum, Count, Average, Min, Max, First, Last
+- **Grouping**: Group data by one or more dimensions
+- **Pivot Tables**: Multi-dimensional data analysis with row and column groups
+- **Date/Time Grouping**: Group by Year, Month, Quarter, Day, etc.
+- **Histograms**: Bin continuous numeric data
+- **Calculations**: Running totals, percentages, differences
+
+## Class Definition
+
+```pascal
+TSummary = class(TDataProvider)
+public
+  By: TGroupBys;           // Array of grouping dimensions
+  Measures: TMeasures;     // Array of aggregated measures
+  SortBy: TSortItems;      // Sort order
+  
+  constructor Create(AOwner: TComponent); override;
+  
+  // Add dimension
+  function AddGroupBy(const AData: TDataItem): TGroupBy; overload;
+  function AddGroupBy(const AExpression: TExpression): TGroupBy; overload;
+  
+  // Add measure
+  function AddMeasure(const AData: TDataItem; const Aggregate: TAggregate): TMeasure; overload;
+  function AddMeasure(const AExpression: TExpression; const Aggregate: TAggregate): TMeasure; overload;
+  
+  // Execute
+  function Calculate: TDataItem; overload;
+  procedure Calculate(const AData: TDataItem); overload;
+  
+  // Clear all
+  procedure Clear;
+  
+  // Validate
+  function Valid: Boolean;
+  procedure Prepare;
+  
+  // Convert to SQL
+  function ToString: String; override;
+  
+published
+  property Description: String;
+  property Filter: TExpression;
+  property Having: TSummaryFilter;
+  property RemoveMissing: TRemoveMissing;
+  property UseFilter: Boolean default True;
+end;
+```
+
+## Core Concepts
+
+### Dimensions (GroupBy)
+
+Dimensions define how data is grouped. Each dimension can be:
+- A data field
+- An expression
+- A date/time part (Year, Month, etc.)
+- A histogram (binned numeric values)
+
+### Measures
+
+Measures define what calculations to perform on each group:
+- **Count**: Number of records
+- **Sum**: Total of values
+- **Average**: Mean value
+- **Minimum**: Smallest value
+- **Maximum**: Largest value
+- **First**: First value in group
+- **Last**: Last value in group
+
+## Methods
+
+### AddGroupBy
+
+Adds a grouping dimension.
+
+<ParamField path="AData" type="TDataItem" required>
+  Data field to group by
+</ParamField>
+
+**Returns:** TGroupBy object for configuration
+
+```pascal
+var
+  Group: TGroupBy;
+begin
+  Group := Summary.AddGroupBy(Data['Country']);
+  Group.Layout := TGroupByLayout.Rows;
+end;
+```
+
+### AddMeasure
+
+Adds an aggregated measure.
+
+<ParamField path="AData" type="TDataItem" required>
+  Data field to aggregate
+</ParamField>
+
+<ParamField path="Aggregate" type="TAggregate" required>
+  Type of aggregation (Sum, Count, Average, etc.)
+</ParamField>
+
+**Returns:** TMeasure object for configuration
+
+```pascal
+var
+  Measure: TMeasure;
+begin
+  Measure := Summary.AddMeasure(Data['Sales'], TAggregate.Sum);
+  Measure.Calculation.Percentage := TCalculationPercentage.Row;
+end;
+```
+
+### Calculate
+
+Executes the summary and returns results.
+
+**Returns:** TDataItem with aggregated data
+
+```pascal
+var
+  Result: TDataItem;
+begin
+  Summary.AddGroupBy(Sales['Country']);
+  Summary.AddMeasure(Sales['Revenue'], TAggregate.Sum);
+  
+  Result := Summary.Calculate;
+end;
+```
+
+### Clear
+
+Removes all dimensions and measures.
+
+```pascal
+Summary.Clear;
+```
+
+### Valid
+
+Checks if the summary has at least one dimension or measure.
+
+**Returns:** Boolean
+
+```pascal
+if Summary.Valid then
+  Result := Summary.Calculate;
+```
+
+## Properties
+
+### Filter
+
+Expression to filter data before aggregation.
+
+```pascal
+Summary.Filter := TDataFilter.FromString(Data, 'Country = "USA"');
+```
+
+### Having
+
+Filter applied after aggregation.
+
+```pascal
+Summary.Having.Add('Sum(Sales) > 10000');
+```
+
+### RemoveMissing
+
+Control removal of rows/columns with missing values.
+
+```pascal
+Summary.RemoveMissing.Rows := True;
+Summary.RemoveMissing.Columns := True;
+```
+
+## TGroupBy Configuration
+
+### Basic Grouping
+
+```pascal
+var
+  Group: TGroupBy;
+begin
+  Group := Summary.AddGroupBy(Data['Category']);
+  Group.Active := True;
+end;
+```
+
+### Date/Time Parts
+
+```pascal
+var
+  Group: TGroupBy;
+begin
+  Group := Summary.AddGroupBy(Orders['OrderDate']);
+  Group.DatePart := TDateTimePart.Year;
+end;
+```
+
+**Available date parts:**
+- Year, Month, Quarter, Day
+- Hour, Minute, Second, Millisecond
+- WeekOfYear, DayOfYear, WeekDay
+- ShortMonthName, LongMonthName
+- Decade, Century, Millennium
+
+### Histogram Binning
+
+```pascal
+var
+  Group: TGroupBy;
+begin
+  Group := Summary.AddGroupBy(Products['Price']);
+  Group.Histogram.Active := True;
+  Group.Histogram.NumBins := 10;
+end;
+```
+
+### Layout
+
+Control whether dimension appears in rows or columns:
+
+```pascal
+Group.Layout := TGroupByLayout.Rows;      // In rows (vertical)
+Group.Layout := TGroupByLayout.Items;     // In columns (horizontal)
+Group.Layout := TGroupByLayout.Automatic; // Let TeeBI decide
+```
+
+## TMeasure Configuration
+
+### Basic Aggregation
+
+```pascal
+Summary.AddMeasure(Sales['Amount'], TAggregate.Sum);
+Summary.AddMeasure(Sales['OrderID'], TAggregate.Count);
+Summary.AddMeasure(Sales['Amount'], TAggregate.Average);
+```
+
+### Calculations
+
+#### Percentages
+
+```pascal
+var
+  Measure: TMeasure;
+begin
+  Measure := Summary.AddMeasure(Sales['Revenue'], TAggregate.Sum);
+  Measure.Calculation.Percentage := TCalculationPercentage.Row;    // % of row total
+  // or
+  Measure.Calculation.Percentage := TCalculationPercentage.Column; // % of column total
+  // or
+  Measure.Calculation.Percentage := TCalculationPercentage.Total;  // % of grand total
+end;
+```
+
+#### Running Totals
+
+```pascal
+Measure.Calculation.Running := TCalculationRunning.Cumulative;  // Cumulative sum
+Measure.Calculation.RunningByRows := True;  // Calculate by rows (vs columns)
+```
+
+#### Differences
+
+```pascal
+Measure.Calculation.Running := TCalculationRunning.Difference;  // Difference from previous
+```
+
+### Missing Values
+
+```pascal
+Measure.Missing.AsZero := True;  // Treat missing values as zero
+```
+
+## Examples
+
+### Simple Aggregation
+
+```pascal
+var
+  Summary: TSummary;
+  Result: TDataItem;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    Summary.AddGroupBy(Sales['Country']);
+    Summary.AddMeasure(Sales['Revenue'], TAggregate.Sum);
+    
+    Result := Summary.Calculate;
+    // Result: Country | Sum(Revenue)
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+### Multiple Aggregates
+
+```pascal
+Summary.AddGroupBy(Sales['Country']);
+Summary.AddMeasure(Sales['Revenue'], TAggregate.Sum);
+Summary.AddMeasure(Sales['Revenue'], TAggregate.Average);
+Summary.AddMeasure(Sales['OrderID'], TAggregate.Count);
+
+Result := Summary.Calculate;
+// Result: Country | Sum(Revenue) | Avg(Revenue) | Count(OrderID)
+```
+
+### Multi-Dimensional (Pivot Table)
+
+```pascal
+Summary.AddGroupBy(Sales['Country']).Layout := TGroupByLayout.Rows;
+Summary.AddGroupBy(Sales['Product']).Layout := TGroupByLayout.Items;
+Summary.AddMeasure(Sales['Quantity'], TAggregate.Sum);
+
+Result := Summary.Calculate;
+// Creates pivot: Countries in rows, Products in columns
+```
+
+### Time Series by Month
+
+```pascal
+var
+  DateGroup: TGroupBy;
+begin
+  DateGroup := Summary.AddGroupBy(Orders['OrderDate']);
+  DateGroup.DatePart := TDateTimePart.Month;
+  
+  Summary.AddMeasure(Orders['Total'], TAggregate.Sum);
+  
+  Result := Summary.Calculate;
+end;
+```
+
+### Yearly Comparison
+
+```pascal
+Summary.AddGroupBy(Sales['Category']).Layout := TGroupByLayout.Rows;
+
+var
+  YearGroup: TGroupBy;
+begin
+  YearGroup := Summary.AddGroupBy(Sales['Date']);
+  YearGroup.DatePart := TDateTimePart.Year;
+  YearGroup.Layout := TGroupByLayout.Items;
+end;
+
+Summary.AddMeasure(Sales['Amount'], TAggregate.Sum);
+
+Result := Summary.Calculate;
+// Categories in rows, Years in columns
+```
+
+### Price Ranges (Histogram)
+
+```pascal
+var
+  PriceGroup: TGroupBy;
+begin
+  PriceGroup := Summary.AddGroupBy(Products['Price']);
+  PriceGroup.Histogram.Active := True;
+  PriceGroup.Histogram.NumBins := 5;
+  PriceGroup.Histogram.Minimum := 0;
+  PriceGroup.Histogram.Maximum := 100;
+  
+  Summary.AddMeasure(Products['ProductID'], TAggregate.Count);
+  
+  Result := Summary.Calculate;
+  // Groups products into 5 price ranges
+end;
+```
+
+### Filtering
+
+```pascal
+// Pre-aggregation filter
+Summary.Filter := TDataFilter.FromString(Sales, 'Year(Date) = 2024');
+Summary.AddGroupBy(Sales['Country']);
+Summary.AddMeasure(Sales['Revenue'], TAggregate.Sum);
+
+// Post-aggregation filter (Having)
+Summary.Having.Add('Sum(Revenue) > 100000');
+
+Result := Summary.Calculate;
+// Only 2024 data, only countries with revenue > 100K
+```
+
+### Percentage of Total
+
+```pascal
+var
+  Measure: TMeasure;
+begin
+  Summary.AddGroupBy(Sales['Product']);
+  
+  Measure := Summary.AddMeasure(Sales['Revenue'], TAggregate.Sum);
+  Measure.Calculation.Percentage := TCalculationPercentage.Total;
+  
+  Result := Summary.Calculate;
+  // Shows each product's % of total revenue
+end;
+```
+
+### Running Total
+
+```pascal
+var
+  Measure: TMeasure;
+  DateGroup: TGroupBy;
+begin
+  DateGroup := Summary.AddGroupBy(Sales['Date']);
+  DateGroup.DatePart := TDateTimePart.Month;
+  
+  Measure := Summary.AddMeasure(Sales['Revenue'], TAggregate.Sum);
+  Measure.Calculation.Running := TCalculationRunning.Cumulative;
+  
+  Result := Summary.Calculate;
+  // Shows cumulative revenue by month
+end;
+```
+
+### Using Expressions
+
+```pascal
+var
+  Expr: TExpression;
+begin
+  // Group by expression
+  Expr := TDataExpression.FromString(Products, 'Upper(Category)');
+  Summary.AddGroupBy(Expr);
+  
+  // Measure expression
+  Expr := TDataExpression.FromString(Sales, 'Price * Quantity');
+  Summary.AddMeasure(Expr, TAggregate.Sum);
+  
+  Result := Summary.Calculate;
+end;
+```
+
+### Sorting Results
+
+```pascal
+Summary.AddGroupBy(Sales['Country']);
+Summary.AddMeasure(Sales['Revenue'], TAggregate.Sum);
+
+// Sort by revenue descending
+Summary.SortBy.Items := ...;
+Summary.SortBy.Items[0].Data := Sales['Revenue'];
+Summary.SortBy.Items[0].Descending := True;
+
+Result := Summary.Calculate;
+```
+
+## Advanced Features
+
+### Multiple Dimensions in Rows
+
+```pascal
+Summary.AddGroupBy(Sales['Region']).Layout := TGroupByLayout.Rows;
+Summary.AddGroupBy(Sales['Country']).Layout := TGroupByLayout.Rows;
+Summary.AddGroupBy(Sales['City']).Layout := TGroupByLayout.Rows;
+Summary.AddMeasure(Sales['Revenue'], TAggregate.Sum);
+
+// Creates hierarchical grouping: Region > Country > City
+```
+
+### Complex Pivot
+
+```pascal
+// Rows: Category, Subcategory
+Summary.AddGroupBy(Products['Category']).Layout := TGroupByLayout.Rows;
+Summary.AddGroupBy(Products['Subcategory']).Layout := TGroupByLayout.Rows;
+
+// Columns: Year, Quarter
+var
+  YearGroup, QuarterGroup: TGroupBy;
+begin
+  YearGroup := Summary.AddGroupBy(Sales['Date']);
+  YearGroup.DatePart := TDateTimePart.Year;
+  YearGroup.Layout := TGroupByLayout.Items;
+  
+  QuarterGroup := Summary.AddGroupBy(Sales['Date']);
+  QuarterGroup.DatePart := TDateTimePart.Quarter;
+  QuarterGroup.Layout := TGroupByLayout.Items;
+end;
+
+// Measures
+Summary.AddMeasure(Sales['Revenue'], TAggregate.Sum);
+Summary.AddMeasure(Sales['OrderID'], TAggregate.Count);
+```
+
+## See Also
+
+- [TBIQuery](/api/tbiquery) - High-level query component
+- [TBISQL](/api/tbisql) - SQL syntax support
+- [TDataSelect](/api/tdataselect) - Selection without aggregation
+- [TExpression](/api/texpression) - Expression engine

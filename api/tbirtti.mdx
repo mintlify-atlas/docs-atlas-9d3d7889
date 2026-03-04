@@ -1,0 +1,297 @@
+---
+title: TRTTIProvider & TTypeProvider
+description: Object-Relational Mapping using RTTI for custom classes and records
+---
+
+## Overview
+
+RTTI providers enable ORM (Object-Relational Mapping) by converting custom Delphi/Pascal classes and records into TDataItem structures and vice versa.
+
+Location: `BI.RTTI.pas:35,70`
+
+## TRTTIProvider
+
+Base class for RTTI-based data providers.
+
+### Constructor
+
+```pascal
+Constructor CreateType(const AOwner: TComponent;
+  const AType: PTypeInfo;
+  const AVisibility: TVisibility = [mvPublic, mvPublished];
+  const AMembers: TRttiMembers = TRttiMembers.Both);
+```
+
+**Parameters:**
+- `AType`: Type information for your class/record
+- `AVisibility`: Which members to include (Public, Published, etc.)
+- `AMembers`: Fields, Properties, or Both
+
+### Properties
+
+```pascal
+property Members: TRttiMembers;      // Fields, Properties, or Both
+property Visibility: TVisibility;    // Member visibility filter
+```
+
+---
+
+## TTypeProvider&lt;T&gt;
+
+Generic provider with type-safe access to data.
+
+### Constructor
+
+```pascal
+Constructor Create(AOwner: TComponent);
+Constructor CreateArray(const AOwner: TComponent; const AValue: array of T);
+```
+
+### Methods
+
+#### Add Data
+
+```pascal
+procedure Add(const AValue: T);
+procedure Add(const AValue: array of T);
+procedure Add(const AValue: TList<T>);
+function Add(const AValue: TValue): Integer;
+```
+
+#### Access Data
+
+```pascal
+function Count: TInteger;
+function Get(const Index: Integer): T;  // or use Items[Index]
+property Items[const Index: TInteger]: T;  // Default array property
+```
+
+#### Search Data
+
+```pascal
+function Find(const AValue: T): TInteger;  // Returns -1 if not found
+```
+
+#### Modify Data
+
+```pascal
+procedure Update(const AIndex: Integer; const AValue: T);
+procedure Delete(const AIndex: Integer);
+procedure Remove(const AValue: T);
+procedure Clear;
+```
+
+### Primary Key
+
+```pascal
+property Primary: TDataItem;  // Designate a primary key field
+```
+
+## Usage Examples
+
+### Define Your Record
+
+```pascal
+type
+  TPerson = record
+    Name: String;
+    Age: Integer;
+    City: String;
+    Salary: Double;
+  end;
+```
+
+### Create Provider
+
+```pascal
+var
+  Provider: TTypeProvider<TPerson>;
+  Person: TPerson;
+begin
+  Provider := TTypeProvider<TPerson>.Create(nil);
+  try
+    // Add data
+    Person.Name := 'Alice';
+    Person.Age := 30;
+    Person.City := 'Madrid';
+    Person.Salary := 50000;
+    Provider.Add(Person);
+    
+    Person.Name := 'Bob';
+    Person.Age := 25;
+    Person.City := 'Barcelona';
+    Person.Salary := 45000;
+    Provider.Add(Person);
+    
+    // Access the TDataItem
+    BIGrid1.Data := Provider.Data;
+    
+    // Read back
+    Person := Provider[0];  // Get first person
+    ShowMessage(Person.Name);
+  finally
+    Provider.Free;
+  end;
+end;
+```
+
+### Using Arrays
+
+```pascal
+var
+  Provider: TTypeProvider<TPerson>;
+  People: array[0..2] of TPerson;
+begin
+  // Fill array
+  People[0].Name := 'Alice';
+  People[0].Age := 30;
+  
+  People[1].Name := 'Bob';
+  People[1].Age := 25;
+  
+  People[2].Name := 'Charlie';
+  People[2].Age := 35;
+  
+  // Create provider from array
+  Provider := TTypeProvider<TPerson>.CreateArray(nil, People);
+  try
+    ShowMessage('Count: ' + IntToStr(Provider.Count));
+    BIChart1.Data := Provider.Data;
+  finally
+    Provider.Free;
+  end;
+end;
+```
+
+### Using Generic Lists
+
+```pascal
+var
+  Provider: TTypeProvider<TPerson>;
+  List: TList<TPerson>;
+  Person: TPerson;
+begin
+  List := TList<TPerson>.Create;
+  try
+    // Add to list
+    Person.Name := 'Alice';
+    Person.Age := 30;
+    List.Add(Person);
+    
+    // More items...
+    
+    // Create provider from list
+    Provider := TTypeProvider<TPerson>.Create(nil);
+    try
+      Provider.Add(List);
+      BIGrid1.Data := Provider.Data;
+    finally
+      Provider.Free;
+    end;
+  finally
+    List.Free;
+  end;
+end;
+```
+
+### Search and Update
+
+```pascal
+var
+  Provider: TTypeProvider<TPerson>;
+  Person: TPerson;
+  Index: Integer;
+begin
+  Provider := TTypeProvider<TPerson>.Create(nil);
+  try
+    // Add data...
+    
+    // Find by value
+    Person.Name := 'Alice';
+    Index := Provider.Find(Person);
+    
+    if Index <> -1 then
+    begin
+      // Update
+      Person := Provider[Index];
+      Person.Salary := 55000;
+      Provider.Update(Index, Person);
+    end;
+  finally
+    Provider.Free;
+  end;
+end;
+```
+
+### Working with Classes
+
+```pascal
+type
+  TEmployee = class
+  published
+    property Name: String;
+    property Department: String;
+    property Salary: Double;
+  end;
+
+var
+  Provider: TTypeProvider<TEmployee>;
+  Emp: TEmployee;
+begin
+  Provider := TTypeProvider<TEmployee>.Create(nil);
+  try
+    Emp := TEmployee.Create;
+    Emp.Name := 'John';
+    Emp.Department := 'IT';
+    Emp.Salary := 60000;
+    
+    Provider.Add(Emp);
+    BIGrid1.Data := Provider.Data;
+  finally
+    Provider.Free;
+  end;
+end;
+```
+
+## Advanced Features
+
+### Nested Records
+
+```pascal
+type
+  TAddress = record
+    Street: String;
+    City: String;
+    ZipCode: String;
+  end;
+  
+  TCustomer = record
+    Name: String;
+    Address: TAddress;  // Nested record
+    Balance: Double;
+  end;
+```
+
+Nested records are automatically converted to sub-tables in TDataItem.
+
+### Visibility Control
+
+```pascal
+var
+  Provider: TRTTIProvider;
+begin
+  Provider := TRTTIProvider.CreateType(
+    nil,
+    TypeInfo(TMyClass),
+    [mvPublic, mvPublished],  // Only public and published
+    TRttiMembers.Properties   // Only properties, not fields
+  );
+end;
+```
+
+## Performance Tips
+
+1. **Batch Adds**: Use array or list overloads instead of adding one by one
+2. **Pre-allocate**: Use CreateArray when you know the data size
+3. **Avoid Find**: Use Primary key for faster lookups
+4. **Clear vs New**: Use Clear to reuse provider instead of Free/Create

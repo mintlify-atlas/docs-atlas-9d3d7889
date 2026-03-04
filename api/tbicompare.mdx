@@ -1,0 +1,305 @@
+---
+title: TDataCompare
+description: Compare data structures and values
+---
+
+## Overview
+
+`TDataCompare` provides methods to compare TDataItem structures, individual values, and detect differences between datasets.
+
+Location: `BI.Compare.pas:71`
+
+## Methods
+
+### Compare Values
+
+```pascal
+class function Compare(const A: TDataItem; const ARow: TInteger;
+                      const B: TDataItem; const BRow: TInteger): Boolean;
+```
+
+Compares a single value from two data items.
+
+**Returns:** True if values are equal (including missing status)
+
+### Compare Same Row
+
+```pascal
+class function Compare(const Before, After: TDataItem; const ARow: TInteger): Boolean;
+```
+
+Compares the same row in two data items.
+
+### Compare Row Arrays
+
+```pascal
+class function Compare(const A: TDataArray; const ARow: TInteger;
+                      const B: TDataArray; const BRow: TInteger): Boolean;
+```
+
+Compares all items in a row across two data arrays.
+
+### Same Structure
+
+```pascal
+class function Same(const Before, After: TDataItem): Boolean;
+```
+
+Checks if two data items have identical structure and values.
+
+### Detailed Differences
+
+```pascal
+class function Same(const Before, After: TDataItem; var Diff: TDifference): Boolean;
+```
+
+Compares and returns detailed differences.
+
+### Compare to Destination
+
+```pascal
+class procedure Compare(const Before, After, Dest: TDataItem);
+```
+
+Compares and stores differences in Dest.
+
+## Difference Classes
+
+### TBaseDifferences
+
+```pascal
+TBaseDifferences = class(TDataItem)
+public
+  Added: TDataItem;     // Row indices that were added
+  Removed: TDataItem;   // Row indices that were removed
+  Modified: TDataItem;  // Row indices that changed
+end;
+```
+
+### TDifference
+
+```pascal
+TDifference = class(TDataItem)
+public
+  Items: TItemDifferences;  // Structural differences
+  Rows: TBaseDifferences;   // Data differences
+end;
+```
+
+## Usage Examples
+
+### Compare Two Values
+
+```pascal
+var
+  Data1, Data2: TDataItem;
+  Same: Boolean;
+begin
+  Data1 := LoadData('version1.csv');
+  Data2 := LoadData('version2.csv');
+  try
+    // Compare row 0 in both datasets
+    Same := TDataCompare.Compare(Data1, 0, Data2, 0);
+    
+    if Same then
+      ShowMessage('Row 0 is identical')
+    else
+      ShowMessage('Row 0 differs');
+  finally
+    Data1.Free;
+    Data2.Free;
+  end;
+end;
+```
+
+### Find Differences
+
+```pascal
+var
+  Before, After: TDataItem;
+  Diff: TDifference;
+begin
+  Before := LoadData('old.csv');
+  After := LoadData('new.csv');
+  try
+    Diff := TDifference.Create;
+    try
+      if TDataCompare.Same(Before, After, Diff) then
+        ShowMessage('No differences')
+      else
+      begin
+        ShowMessage(
+          'Added rows: ' + IntToStr(Diff.Rows.Added.Count) + #13 +
+          'Removed rows: ' + IntToStr(Diff.Rows.Removed.Count) + #13 +
+          'Modified rows: ' + IntToStr(Diff.Rows.Modified.Count)
+        );
+      end;
+    finally
+      Diff.Free;
+    end;
+  finally
+    Before.Free;
+    After.Free;
+  end;
+end;
+```
+
+### Track Changes
+
+```pascal
+procedure TForm1.ShowChanges(const Original, Current: TDataItem);
+var
+  Diff: TDifference;
+  i: Integer;
+begin
+  Diff := TDifference.Create;
+  try
+    TDataCompare.Same(Original, Current, Diff);
+    
+    // Show added rows
+    Memo1.Lines.Add('Added Rows:');
+    for i := 0 to Diff.Rows.Added.Count - 1 do
+      Memo1.Lines.Add('  Row ' + IntToStr(Diff.Rows.Added.Int64Data[i]));
+    
+    // Show removed rows
+    Memo1.Lines.Add('Removed Rows:');
+    for i := 0 to Diff.Rows.Removed.Count - 1 do
+      Memo1.Lines.Add('  Row ' + IntToStr(Diff.Rows.Removed.Int64Data[i]));
+    
+    // Show modified rows
+    Memo1.Lines.Add('Modified Rows:');
+    for i := 0 to Diff.Rows.Modified.Count - 1 do
+      Memo1.Lines.Add('  Row ' + IntToStr(Diff.Rows.Modified.Int64Data[i]));
+  finally
+    Diff.Free;
+  end;
+end;
+```
+
+### Compare Arrays
+
+```pascal
+var
+  Data1, Data2: TDataItem;
+  Items1, Items2: TDataArray;
+  i: Integer;
+begin
+  Data1 := LoadData('set1.csv');
+  Data2 := LoadData('set2.csv');
+  try
+    Items1 := Data1.Items.AsArray;
+    Items2 := Data2.Items.AsArray;
+    
+    for i := 0 to Min(Data1.Count, Data2.Count) - 1 do
+    begin
+      if not TDataCompare.Compare(Items1, i, Items2, i) then
+        ShowMessage('Row ' + IntToStr(i) + ' differs');
+    end;
+  finally
+    Data1.Free;
+    Data2.Free;
+  end;
+end;
+```
+
+### Version Control
+
+```pascal
+type
+  TDataVersion = class
+    Version: Integer;
+    Data: TDataItem;
+    TimeStamp: TDateTime;
+  end;
+
+procedure CompareVersions(const V1, V2: TDataVersion);
+var
+  Diff: TDifference;
+begin
+  Diff := TDifference.Create;
+  try
+    if TDataCompare.Same(V1.Data, V2.Data, Diff) then
+      ShowMessage('Versions ' + IntToStr(V1.Version) + ' and ' +
+                  IntToStr(V2.Version) + ' are identical')
+    else
+    begin
+      ShowMessage(
+        Format('Changes from v%d to v%d:' + #13 +
+               '  Added: %d rows' + #13 +
+               '  Removed: %d rows' + #13 +
+               '  Modified: %d rows',
+               [V1.Version, V2.Version,
+                Diff.Rows.Added.Count,
+                Diff.Rows.Removed.Count,
+                Diff.Rows.Modified.Count])
+      );
+    end;
+  finally
+    Diff.Free;
+  end;
+end;
+```
+
+### Validate Equality
+
+```pascal
+function DataEquals(const A, B: TDataItem): Boolean;
+begin
+  Result := TDataCompare.Same(A, B);
+end;
+
+// Usage
+if DataEquals(OriginalData, ModifiedData) then
+  ShowMessage('Data unchanged')
+else
+  ShowMessage('Data has been modified');
+```
+
+### Audit Trail
+
+```pascal
+procedure LogChanges(const Before, After: TDataItem; const Log: TStrings);
+var
+  Diff: TDifference;
+  i: Integer;
+begin
+  Diff := TDifference.Create;
+  try
+    TDataCompare.Same(Before, After, Diff);
+    
+    Log.Add('Change Log - ' + DateTimeToStr(Now));
+    Log.Add('=====================================');
+    
+    if Diff.Rows.Added.Count > 0 then
+    begin
+      Log.Add('New Records: ' + IntToStr(Diff.Rows.Added.Count));
+      for i := 0 to Diff.Rows.Added.Count - 1 do
+        Log.Add('  + Row ' + IntToStr(Diff.Rows.Added.Int64Data[i]));
+    end;
+    
+    if Diff.Rows.Removed.Count > 0 then
+    begin
+      Log.Add('Deleted Records: ' + IntToStr(Diff.Rows.Removed.Count));
+      for i := 0 to Diff.Rows.Removed.Count - 1 do
+        Log.Add('  - Row ' + IntToStr(Diff.Rows.Removed.Int64Data[i]));
+    end;
+    
+    if Diff.Rows.Modified.Count > 0 then
+    begin
+      Log.Add('Modified Records: ' + IntToStr(Diff.Rows.Modified.Count));
+      for i := 0 to Diff.Rows.Modified.Count - 1 do
+        Log.Add('  * Row ' + IntToStr(Diff.Rows.Modified.Int64Data[i]));
+    end;
+  finally
+    Diff.Free;
+  end;
+end;
+```
+
+## Features
+
+- **Value Comparison**: Respects data types and missing values
+- **Structure Comparison**: Checks schema compatibility
+- **Row Tracking**: Identifies added, removed, and modified rows
+- **Detailed Differences**: Returns complete change information
+- **Type-Safe**: Compares matching data kinds correctly

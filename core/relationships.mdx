@@ -1,0 +1,432 @@
+---
+title: Relationships
+description: Master-detail relationships and data linking in TeeBI
+---
+
+## Overview
+
+TeeBI supports powerful relational data structures through master-detail relationships. These relationships enable you to link columns together, creating foreign key constraints and efficiently navigating between related data sets.
+
+## Master-Detail Concept
+
+In TeeBI, a **detail** TDataItem can reference a **master** TDataItem, establishing a parent-child relationship similar to database foreign keys:
+
+```
+Customers (Master)
+├─ CustomerID: [1, 2, 3]
+├─ Name: ['Acme', 'TechCorp', 'BuildIt']
+
+Orders (Detail)
+├─ OrderID: [101, 102, 103, 104]
+├─ CustomerID: [1, 1, 2, 3]  ← Links to Customers.CustomerID
+├─ Amount: [500, 300, 800, 450]
+```
+
+The `CustomerID` column in Orders references the `CustomerID` column in Customers, creating a master-detail relationship.
+
+## Setting Up Relationships
+
+### Basic Master-Detail Setup
+
+```pascal
+var
+  Customers, Orders: TDataItem;
+  CustID, OrderCustID: TDataItem;
+begin
+  // Create master table
+  Customers := TDataItem.Create(True);
+  Customers.Name := 'Customers';
+  
+  CustID := Customers.Items.Add('CustomerID', dkInt32);
+  Customers.Items.Add('Name', dkText);
+  
+  // Add master data
+  Customers.Resize(3);
+  CustID.Int32Data[0] := 1;
+  CustID.Int32Data[1] := 2;
+  CustID.Int32Data[2] := 3;
+  
+  // Create detail table
+  Orders := TDataItem.Create(True);
+  Orders.Name := 'Orders';
+  
+  Orders.Items.Add('OrderID', dkInt32);
+  OrderCustID := Orders.Items.Add('CustomerID', dkInt32);
+  Orders.Items.Add('Amount', dkDouble);
+  
+  // Add detail data
+  Orders.Resize(4);
+  OrderCustID.Int32Data[0] := 1;
+  OrderCustID.Int32Data[1] := 1;
+  OrderCustID.Int32Data[2] := 2;
+  OrderCustID.Int32Data[3] := 3;
+  
+  // Establish the relationship
+  OrderCustID.Master := CustID;
+end;
+```
+
+### Master Property
+
+The `Master` property establishes the relationship:
+
+```pascal
+property Master: TDataItem read GetMaster write SetMaster;
+```
+
+<Note>
+The master and detail columns must have compatible data types (typically both dkInt32, dkInt64, or dkText).
+</Note>
+
+## Self-Detail Relationships
+
+You can create hierarchical structures where a TDataItem references itself:
+
+```pascal
+var
+  Employees: TDataItem;
+  EmpID, ManagerID: TDataItem;
+begin
+  Employees := TDataItem.Create(True);
+  Employees.Name := 'Employees';
+  
+  EmpID := Employees.Items.Add('EmployeeID', dkInt32);
+  Employees.Items.Add('Name', dkText);
+  ManagerID := Employees.Items.Add('ManagerID', dkInt32);
+  
+  // Add data
+  Employees.Resize(4);
+  EmpID.Int32Data[0] := 1;  // CEO
+  EmpID.Int32Data[1] := 2;  // Manager
+  EmpID.Int32Data[2] := 3;  // Employee
+  EmpID.Int32Data[3] := 4;  // Employee
+  
+  ManagerID.Int32Data[0] := 0;  // CEO has no manager
+  ManagerID.Int32Data[1] := 1;  // Reports to CEO
+  ManagerID.Int32Data[2] := 2;  // Reports to Manager
+  ManagerID.Int32Data[3] := 2;  // Reports to Manager
+  
+  // Self-referential relationship
+  ManagerID.Master := EmpID;
+end;
+```
+
+The `TMasterDetail.IsSelfDetail` property will be `True` when the master and detail are in the same parent table.
+
+## Master Index
+
+TeeBI automatically creates an index for efficient lookups between master and detail records:
+
+```pascal
+var
+  Orders: TDataItem;
+  OrderCustID: TDataItem;
+begin
+  // After setting Master property...
+  OrderCustID.Master := CustID;
+  
+  // Create the index for fast lookups
+  OrderCustID.CreateMasterIndex;
+  
+  // The index is stored in IMaster.Index
+  // IMaster.Index[0] contains the master row for detail row 0
+end;
+```
+
+### How the Index Works
+
+The master index is an array where each position corresponds to a detail row, and the value is the master row index:
+
+```pascal
+// Detail CustomerID: [1, 1, 2, 3]
+// Master CustomerID: [1, 2, 3]
+// Index array:       [0, 0, 1, 2]
+//
+// Detail row 0: CustomerID=1 → Master row 0
+// Detail row 1: CustomerID=1 → Master row 0  
+// Detail row 2: CustomerID=2 → Master row 1
+// Detail row 3: CustomerID=3 → Master row 2
+```
+
+## Navigating Relationships
+
+### Finding Master Record
+
+```pascal
+function GetMasterRow(const DetailRow: Integer): Integer;
+begin
+  if OrderCustID.IMaster.Index <> nil then
+    Result := OrderCustID.IMaster.Index[DetailRow]
+  else
+    Result := -1;
+end;
+
+var
+  DetailRow, MasterRow: Integer;
+  CustomerName: String;
+begin
+  DetailRow := 0;  // First order
+  MasterRow := GetMasterRow(DetailRow);
+  
+  if MasterRow >= 0 then
+  begin
+    CustomerName := Customers['Name'].TextData[MasterRow];
+    ShowMessage('Customer: ' + CustomerName);
+  end;
+end;
+```
+
+### Finding Detail Records
+
+Use the `TMasterDetail.GetIndex` method to find all detail rows for a master row:
+
+```pascal
+var
+  MasterRow: Integer;
+  DetailRows: TNativeIntArray;
+  I: Integer;
+begin
+  MasterRow := 0;  // First customer
+  
+  // Get all orders for this customer
+  DetailRows := OrderCustID.IMaster.GetIndex(CustID, MasterRow);
+  
+  ShowMessage(Format('Customer has %d orders', [Length(DetailRows)]));
+  
+  for I := 0 to High(DetailRows) do
+  begin
+    ShowMessage(
+      Format('Order %d: Amount = %f',
+        [Orders['OrderID'].Int32Data[DetailRows[I]],
+         Orders['Amount'].DoubleData[DetailRows[I]]]
+      )
+    );
+  end;
+end;
+```
+
+## Multiple Relationships
+
+A table can have multiple master-detail relationships:
+
+```pascal
+var
+  Orders, Customers, Products: TDataItem;
+  OrderCustID, OrderProdID: TDataItem;
+begin
+  // Orders table with two relationships
+  Orders := TDataItem.Create(True);
+  
+  OrderCustID := Orders.Items.Add('CustomerID', dkInt32);
+  OrderProdID := Orders.Items.Add('ProductID', dkInt32);
+  
+  // First relationship: Orders → Customers
+  OrderCustID.Master := Customers['CustomerID'];
+  
+  // Second relationship: Orders → Products
+  OrderProdID.Master := Products['ProductID'];
+end;
+```
+
+## Checking for Relationships
+
+Use the `HasMaster` helper method:
+
+```pascal
+function TDataItem.HasMaster: Boolean;
+begin
+  Result := (IMaster.Data <> nil) or (IMaster.Origin <> '');
+end;
+
+// Usage:
+if OrderCustID.HasMaster then
+  ShowMessage('This column has a master relationship');
+```
+
+## Automatic Relationships
+
+TeeBI can automatically detect relationships based on matching column names and types:
+
+```pascal
+// When loading from databases or files, TeeBI will automatically
+// create relationships if:
+// 1. Column names match (e.g., "CustomerID" in both tables)
+// 2. Data types are compatible
+// 3. Values in detail exist in master (referential integrity)
+```
+
+## Working with Detail Data
+
+The `TDetailData` class provides a convenient way to work with detail records:
+
+```pascal
+type
+  TDetailData = class(TDataItem)
+  public
+    Detail: TDataItem;
+    constructor Create(const ADetail: TDataItem; const AName: String);
+  end;
+
+var
+  CustomerOrders: TDetailData;
+begin
+  // Create a detail data item for a specific relationship
+  CustomerOrders := TDetailData.Create(Orders, 'CustomerOrders');
+  CustomerOrders.Detail := Orders;
+end;
+```
+
+## Relationship Integrity
+
+### Orphan Records
+
+When a detail row references a master value that doesn't exist, the index contains `-1`:
+
+```pascal
+var
+  MasterRow: Integer;
+begin
+  MasterRow := OrderCustID.IMaster.Index[DetailRow];
+  
+  if MasterRow = -1 then
+    ShowMessage('Orphan record: no matching master')
+  else
+    ShowMessage('Valid relationship');
+end;
+```
+
+### Missing Values in Relationships
+
+Detail records with missing values in the foreign key are handled specially:
+
+```pascal
+if OrderCustID.Missing[DetailRow] then
+  ShowMessage('No customer assigned to this order')
+else
+  MasterRow := OrderCustID.IMaster.Index[DetailRow];
+```
+
+## Performance Considerations
+
+<CardGroup cols={2}>
+  <Card title="Create Index Once" icon="gauge-high">
+    Call `CreateMasterIndex` after setting up the relationship and loading data. Don't recreate it for every lookup.
+  </Card>
+
+  <Card title="Use Unique Masters" icon="fingerprint">
+    Performance is best when master columns contain unique values. TeeBI optimizes lookups using the `Unique` property.
+  </Card>
+
+  <Card title="Sort for Speed" icon="arrow-down-1-9">
+    Sorted master data enables faster binary search during index creation.
+  </Card>
+
+  <Card title="Batch Operations" icon="layer-group">
+    When processing many relationships, load all master data first, then create indices for all detail tables.
+  </Card>
+</CardGroup>
+
+## Complex Relationship Example
+
+```pascal
+var
+  Customers, Orders, OrderItems, Products: TDataItem;
+  
+procedure BuildRelationships;
+begin
+  // Customers (Master)
+  Customers := TDataItem.Create(True);
+  Customers.Items.Add('CustomerID', dkInt32);
+  Customers.Items.Add('Name', dkText);
+  
+  // Products (Master)
+  Products := TDataItem.Create(True);
+  Products.Items.Add('ProductID', dkInt32);
+  Products.Items.Add('ProductName', dkText);
+  Products.Items.Add('Price', dkDouble);
+  
+  // Orders (Detail of Customers)
+  Orders := TDataItem.Create(True);
+  Orders.Items.Add('OrderID', dkInt32);
+  Orders.Items.Add('CustomerID', dkInt32).Master := Customers['CustomerID'];
+  Orders.Items.Add('OrderDate', dkDateTime);
+  
+  // OrderItems (Detail of Orders and Products)
+  OrderItems := TDataItem.Create(True);
+  OrderItems.Items.Add('OrderItemID', dkInt32);
+  OrderItems.Items.Add('OrderID', dkInt32).Master := Orders['OrderID'];
+  OrderItems.Items.Add('ProductID', dkInt32).Master := Products['ProductID'];
+  OrderItems.Items.Add('Quantity', dkInt32);
+  
+  // Create indices for fast navigation
+  Orders['CustomerID'].CreateMasterIndex;
+  OrderItems['OrderID'].CreateMasterIndex;
+  OrderItems['ProductID'].CreateMasterIndex;
+end;
+
+procedure FindCustomerOrders(const CustomerID: Integer);
+var
+  CustRow: Integer;
+  OrderRows: TNativeIntArray;
+  I, OrderRow: Integer;
+  OrderItemRows: TNativeIntArray;
+  J: Integer;
+begin
+  // Find customer
+  CustRow := Customers['CustomerID'].Int32Data.IndexOf(CustomerID);
+  if CustRow < 0 then Exit;
+  
+  // Find all orders for this customer
+  OrderRows := Orders['CustomerID'].IMaster.GetIndex(
+    Customers['CustomerID'], CustRow
+  );
+  
+  for I := 0 to High(OrderRows) do
+  begin
+    OrderRow := OrderRows[I];
+    
+    // Find all items in this order
+    OrderItemRows := OrderItems['OrderID'].IMaster.GetIndex(
+      Orders['OrderID'], OrderRow
+    );
+    
+    // Process order items...
+  end;
+end;
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Use compatible types">
+    Ensure master and detail columns have the same data type (dkInt32, dkInt64, or dkText).
+  </Step>
+  
+  <Step title="Create indices after loading data">
+    Load all data first, then call `CreateMasterIndex` once for optimal performance.
+  </Step>
+  
+  <Step title="Handle orphans gracefully">
+    Check for index value of `-1` which indicates an orphan record with no matching master.
+  </Step>
+  
+  <Step title="Leverage automatic detection">
+    Use consistent naming conventions so TeeBI can automatically detect relationships when loading data.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Data Items" icon="database" href="/core/data-items">
+    Learn more about TDataItem structure
+  </Card>
+  
+  <Card title="Arrays" icon="list" href="/core/arrays">
+    Understand the array storage behind relationships
+  </Card>
+  
+  <Card title="Querying Data" icon="filter" href="/operations/queries">
+    Use relationships in data queries
+  </Card>
+</CardGroup>

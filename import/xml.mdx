@@ -1,0 +1,410 @@
+---
+title: XML Import
+description: Parse XML files with automatic hierarchy detection
+---
+
+The `TBIXML` class provides XML data import with automatic structure detection, attribute handling, and support for multiple XML engines.
+
+## Quick Start
+
+```pascal
+uses BI.XMLData, BI.DataItem;
+
+var
+  Data: TDataItem;
+  
+// Import XML file
+Data := TBIXML.FromFile('data.xml');
+
+// Import from text
+var
+  XML: TBIXML;
+XML := TBIXML.Create;
+try
+  Data := XML.ImportText('<products><product name="Widget" price="19.99"/></products>');
+finally
+  XML.Free;
+end;
+```
+
+## Key Methods
+
+### ImportText
+
+Import from XML string:
+
+```pascal
+function ImportText(const Text: String): TDataItem;
+```
+
+**Example:**
+```pascal
+var
+  XMLText: String;
+  
+XMLText := '<catalog>' +
+  '<book id="1">' +
+    '<title>Pascal Programming</title>' +
+    '<author>John Doe</author>' +
+    '<price>29.99</price>' +
+  '</book>' +
+'</catalog>';
+
+Data := XML.ImportText(XMLText);
+BIGrid1.Data := Data;
+```
+
+### Import from TStrings
+
+```pascal
+function Import(const Strings: TStrings): TDataArray;
+```
+
+**Example:**
+```pascal
+var
+  DataArray: TDataArray;
+  
+DataArray := XML.Import(Memo1.Lines);
+Data := TBISource.FromData(DataArray);
+```
+
+### Parse
+
+Validate XML without full import:
+
+```pascal
+function Parse(const Text: String): Boolean;
+```
+
+**Example:**
+```pascal
+if XML.Parse(XMLString) then
+  ShowMessage('Valid XML')
+else
+  ShowMessage('Invalid XML');
+```
+
+### Import from Folder
+
+```pascal
+function Import(const Folder: String; Recursive: Boolean = False): TDataArray;
+```
+
+**Example:**
+```pascal
+XML.IncludePattern := '*.xml';
+DataArray := XML.Import('C:\\XMLData', True);
+```
+
+## XML Structure Handling
+
+### Elements
+
+XML elements become data items:
+
+```xml
+<customers>
+  <customer>
+    <name>John Smith</name>
+    <email>john@example.com</email>
+  </customer>
+</customers>
+```
+
+```pascal
+Data := TBIXML.FromFile('customers.xml');
+CustomerName := Data['customers']['customer']['name'].TextData[0];
+```
+
+### Attributes
+
+Attributes are imported as separate columns:
+
+```xml
+<products>
+  <product id="101" name="Widget" price="19.99"/>
+  <product id="102" name="Gadget" price="29.99"/>
+</products>
+```
+
+```pascal
+Data := TBIXML.FromFile('products.xml');
+Products := Data['products']['product'];
+
+// Access attributes
+ProductID := Products['id'].Int32Data[0];
+ProductName := Products['name'].TextData[0];
+```
+
+### Nested Elements
+
+Automatic master-detail relationships:
+
+```xml
+<orders>
+  <order id="1">
+    <customer>John</customer>
+    <items>
+      <item product="Widget" qty="2"/>
+      <item product="Gadget" qty="1"/>
+    </items>
+  </order>
+</orders>
+```
+
+```pascal
+Data := TBIXML.FromFile('orders.xml');
+Order := Data['orders']['order'];
+Items := Order['items']['item'];
+
+BIGrid1.Data := Order;
+BIGrid2.Data := Items; // Detail grid
+```
+
+## XML Engines
+
+TBIXML supports multiple XML parser engines:
+
+```pascal
+uses BI.XMLData.MSXML;  // Windows default
+uses BI.XMLData.FPC;    // FreePascal
+uses BI.XMLData.OXml;   // OmniXML
+uses BI.XMLData.Omni;   // Alternative
+
+// Set custom engine
+TBIXML.EngineClass := TMsXML;
+```
+
+### Create Custom Engine
+
+```pascal
+var
+  XMLEngine: TXmlEngine;
+  XML: TBIXML;
+  
+XMLEngine := TBIXML.CreateParser;
+XML := TBIXML.CreateEngine(XMLEngine);
+try
+  Data := XML.ImportText(XMLString);
+finally
+  XML.Free;
+end;
+```
+
+## Configuration Options
+
+### Hierarchical Mode
+
+```pascal
+XML.Hierarchical := True;  // Default - preserve structure
+XML.Hierarchical := False; // Create flat master-detail
+```
+
+### Exclude Nodes
+
+Skip specific XML nodes:
+
+```pascal
+XML.ExcludeNodes := ['metadata', 'header', 'footer'];
+```
+
+**Example:**
+```pascal
+var
+  XML: TBIXML;
+  
+XML := TBIXML.Create;
+try
+  XML.ExcludeNodes := ['xmlns', 'xsi'];
+  Data := XML.ImportFile('document.xml');
+finally
+  XML.Free;
+end;
+```
+
+### QuotedBooleans
+
+```pascal
+XML.QuotedBooleans := True; // "true"/"false"
+XML.QuotedBooleans := False; // true/false
+```
+
+## Advanced Examples
+
+### Import with Progress
+
+```pascal
+var
+  XML: TBIXML;
+  
+XML := TBIXML.Create;
+try
+  XML.OnProgress := procedure(Sender: TObject; 
+                              Percent: Integer; 
+                              var Cancel: Boolean)
+    begin
+      ProgressBar1.Position := Percent;
+      if UserCanceled then
+        Cancel := True;
+    end;
+    
+  Data := XML.ImportFile('large_document.xml');
+finally
+  XML.Free;
+end;
+```
+
+### Handle Import Errors
+
+```pascal
+XML.OnError := function(Sender: TObject; 
+                        const ErrorMsg: String): Boolean
+  begin
+    Memo1.Lines.Add('Error: ' + ErrorMsg);
+    Result := True; // Continue import
+  end;
+```
+
+### Mixed Content
+
+```xml
+<book>
+  <title>XML Guide</title>
+  <chapters>
+    <chapter num="1">Introduction</chapter>
+    <chapter num="2">Getting Started</chapter>
+  </chapters>
+</book>
+```
+
+```pascal
+Data := TBIXML.FromFile('book.xml');
+Chapters := Data['book']['chapters']['chapter'];
+
+// Access both attributes and text
+ChapterNum := Chapters['num'].Int32Data[0];
+ChapterTitle := Chapters.TextData[0];
+```
+
+## Export to XML
+
+Use `TBIXMLExport` to save data as XML:
+
+```pascal
+uses BI.XMLData;
+
+var
+  Export: TBIXMLExport;
+  
+Export := TBIXMLExport.Create;
+try
+  Export.Data := MyData;
+  Export.Emit := TBIXMLEmit.Header; // Include XML header
+  
+  Export.SaveToFile('output.xml');
+finally
+  Export.Free;
+end;
+```
+
+### Export Options
+
+```pascal
+type
+  TBIXMLEmit = (Header, Simple);
+  
+Export.Emit := TBIXMLEmit.Header; // <?xml version="1.0"?>
+Export.Emit := TBIXMLEmit.Simple; // No header
+```
+
+## File Format Detection
+
+```pascal
+// Check if file is XML
+if TBIXML.Supports('.xml') then
+  Data := TBIXML.FromFile(FileName);
+
+// Get file filter for dialogs
+OpenDialog1.Filter := TBIXML.FileFilter.ToString;
+// Returns: 'XML files|*.xml'
+```
+
+## Common XML Patterns
+
+### SOAP Response
+
+```xml
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <GetCustomersResponse>
+      <customers>
+        <customer id="1" name="John"/>
+      </customers>
+    </GetCustomersResponse>
+  </soap:Body>
+</soap:Envelope>
+```
+
+```pascal
+Data := TBIXML.FromFile('response.xml');
+Customers := Data['Envelope']['Body']['GetCustomersResponse']['customers'];
+```
+
+### RSS Feed
+
+```xml
+<rss version="2.0">
+  <channel>
+    <title>My Blog</title>
+    <item>
+      <title>Post Title</title>
+      <link>http://example.com/post</link>
+      <pubDate>Mon, 01 Jan 2024 12:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
+```
+
+```pascal
+Data := TBIXML.FromFile('feed.xml');
+Items := Data['rss']['channel']['item'];
+BIGrid1.Data := Items;
+```
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Namespace prefixes not recognized">
+    Add namespaces to exclude list:
+    ```pascal
+    XML.ExcludeNodes := ['xmlns', 'xsi'];
+    ```
+  </Accordion>
+  
+  <Accordion title="Attributes missing from import">
+    Attributes are automatically imported as separate columns. Check the column names.
+  </Accordion>
+  
+  <Accordion title="Empty elements cause errors">
+    Empty elements are marked as Missing data:
+    ```pascal
+    if Data['field'].Missing[0] then
+      // Handle missing value
+    ```
+  </Accordion>
+  
+  <Accordion title="Wrong XML parser on Linux">
+    Set the FPC engine explicitly:
+    ```pascal
+    uses BI.XMLData.FPC;
+    TBIXML.EngineClass := TFPCXML;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+- [Data Import Overview](/import/overview)
+- [JSON Import](/import/json)
+- [CSV Import](/import/csv)

@@ -1,0 +1,275 @@
+---
+title: Simple Queries
+description: Basic query operations - select, filter, sort, and aggregate data
+---
+
+TeeBI provides SQL-like query syntax for data manipulation and aggregation.
+
+## Select Columns
+
+```pascal
+uses BI.SQL;
+
+var Result: TDataItem;
+
+// Select specific columns
+Result := TBISQL.From(Data, 'ProductName, UnitPrice, Stock');
+
+// Select all columns
+Result := TBISQL.From(Data, '*');
+
+// Select with expressions
+Result := TBISQL.From(Data, 'ProductName, UnitPrice * 1.1 as PriceWithTax');
+```
+
+## Filter Data (WHERE)
+
+```pascal
+// Simple condition
+Result := TBISQL.From(Data, 'ProductName, UnitPrice where UnitPrice > 100');
+
+// Multiple conditions with AND
+Result := TBISQL.From(Data, 
+  'ProductName where Category = "Electronics" and Stock > 10');
+
+// OR conditions
+Result := TBISQL.From(Data, 
+  'ProductName where Category = "Books" or Category = "Music"');
+
+// IN operator
+Result := TBISQL.From(Data, 
+  'ProductName where Category in ("Books", "Music", "Movies")');
+
+// NOT operator
+Result := TBISQL.From(Data, 'ProductName where not (Stock = 0)');
+```
+
+## Sort Data (ORDER BY)
+
+```pascal
+// Ascending order (default)
+Result := TBISQL.From(Data, 'ProductName, UnitPrice order by UnitPrice');
+
+// Descending order
+Result := TBISQL.From(Data, 'ProductName, UnitPrice order by UnitPrice desc');
+
+// Multiple sort columns
+Result := TBISQL.From(Data, 
+  'ProductName, Category, UnitPrice order by Category, UnitPrice desc');
+```
+
+## Limit Results (TOP)
+
+```pascal
+// Get first 10 rows
+Result := TBISQL.From(Data, 'top 10 ProductName, UnitPrice');
+
+// Skip first 50, take next 25 (pagination)
+Result := TBISQL.From(Data, 'top 25 offset 50 ProductName, UnitPrice');
+
+// Top with order by
+Result := TBISQL.From(Data, 
+  'top 5 ProductName, UnitPrice order by UnitPrice desc');
+```
+
+## Distinct Values
+
+```pascal
+// Get unique categories
+Result := TBISQL.From(Data, 'distinct Category');
+
+// Distinct with multiple columns
+Result := TBISQL.From(Data, 'distinct Category, Color');
+```
+
+## Aggregate Functions
+
+```pascal
+// Count rows
+Result := TBISQL.From(Data, 'count(*)');
+
+// Sum, Average, Min, Max
+Result := TBISQL.From(Data, 'sum(Stock), avg(UnitPrice), min(UnitPrice), max(UnitPrice)');
+
+// Count distinct
+Result := TBISQL.From(Data, 'count(distinct Category)');
+```
+
+## Complete Example
+
+```pascal
+uses
+  BI.DataItem, BI.SQL, BI.Persist,
+  VCLBI.Grid;
+
+procedure TForm1.RunQuery;
+var
+  Data, Result: TDataItem;
+begin
+  // Load sample data
+  Data := TStore.Load('BISamples', 'Products');
+
+  try
+    // Complex query: filter, sort, and limit
+    Result := TBISQL.From(Data,
+      'top 20 ProductName, Category, UnitPrice, Stock ' +
+      'where (Category = "Electronics" or Category = "Books") ' +
+      '  and Stock > 0 ' +
+      'order by UnitPrice desc');
+
+    // Display in grid
+    BIGrid1.Data := Result;
+  finally
+    Data.Free;
+  end;
+end;
+```
+
+## Sub-Queries
+
+```pascal
+// Select products with above-average price
+Result := TBISQL.From(Data,
+  'ProductName, UnitPrice where UnitPrice > select avg(UnitPrice)');
+
+// Select with sub-query in select list
+Result := TBISQL.From(Data,
+  'ProductName, UnitPrice, (select avg(UnitPrice)) as AvgPrice');
+```
+
+## Date Filters
+
+```pascal
+// Filter by date
+Result := TBISQL.From(Data, 
+  'OrderID, OrderDate where OrderDate >= "2024-01-01"');
+
+// Date parts
+Result := TBISQL.From(Data, 
+  'OrderID where year(OrderDate) = 2024 and month(OrderDate) = 3');
+
+// Date ranges
+Result := TBISQL.From(Data, 
+  'OrderID where OrderDate between "2024-01-01" and "2024-12-31"');
+```
+
+## Text Filters
+
+```pascal
+// Contains
+Result := TBISQL.From(Data, 
+  'ProductName where ProductName like "%phone%"');
+
+// Starts with
+Result := TBISQL.From(Data, 
+  'ProductName where ProductName like "Smart%"');
+
+// Ends with
+Result := TBISQL.From(Data, 
+  'ProductName where ProductName like "%Pro"');
+
+// Case-insensitive comparison
+Result := TBISQL.From(Data, 
+  'ProductName where lower(ProductName) = "iphone"');
+```
+
+## Using BIQuery Component
+
+<Tabs>
+  <Tab title="VCL">
+```pascal
+type
+  TForm1 = class(TForm)
+    BIQuery1: TBIQuery;
+    BIGrid1: TBIGrid;
+    procedure FormCreate(Sender: TObject);
+  private
+    Data, QueryResult: TDataItem;
+  end;
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  Data := TStore.Load('BISamples', 'Products');
+
+  // Parse query
+  BIQuery1.Parse(Data, 'ProductName, UnitPrice where Stock > 0');
+
+  // Execute
+  QueryResult := BIQuery1.Calculate;
+
+  // Display
+  BIGrid1.Data := QueryResult;
+end;
+```
+  </Tab>
+  <Tab title="FMX">
+```pascal
+type
+  TForm1 = class(TForm)
+    BIQuery1: TBIQuery;
+    BIGrid1: TBIGrid;
+    procedure FormCreate(Sender: TObject);
+  private
+    Data, QueryResult: TDataItem;
+  end;
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  Data := TStore.Load('BISamples', 'Products');
+
+  // Parse and execute query
+  BIQuery1.Parse(Data, 'ProductName, UnitPrice where Stock > 0');
+  QueryResult := BIQuery1.Calculate;
+
+  // Display in FMX grid
+  BIGrid1.Data := QueryResult;
+end;
+```
+  </Tab>
+</Tabs>
+
+## Error Handling
+
+```pascal
+uses BI.SQL, BI.Expression;
+
+var
+  Parser: TSQLParser;
+  Result: TDataProvider;
+begin
+  Parser := TSQLParser.Create(Data, 'invalid query syntax');
+  try
+    Result := Parser.Parse(
+      function(const Sender: TObject; const Error: String): Boolean
+      begin
+        ShowMessage('SQL Error: ' + Error);
+        Result := True;  // Return True to handle error
+      end
+    );
+
+    if Result <> nil then
+    begin
+      // Query succeeded
+      Result.Free;
+    end;
+  finally
+    Parser.Free;
+  end;
+end;
+```
+
+## Performance Tips
+
+<Card title="Query Optimization" icon="bolt">
+  - Use WHERE clauses to filter data early
+  - Select only needed columns, not `*`
+  - Use TOP/OFFSET for pagination
+  - Create indexes on frequently queried columns
+</Card>
+
+## See Also
+
+- [SQL Queries](/examples/sql-queries) - Advanced SQL features
+- [Group By](/examples/group-by) - Aggregation and grouping
+- [Filters](/examples/filters) - Advanced filtering techniques
+- [Expressions](/examples/expressions) - Custom calculations

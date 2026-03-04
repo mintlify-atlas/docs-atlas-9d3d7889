@@ -1,0 +1,365 @@
+---
+title: Master-Detail
+description: Work with related tables and hierarchical data
+---
+
+TeeBI automatically manages relationships between tables for master-detail scenarios.
+
+## Basic Master-Detail
+
+```pascal
+uses
+  BI.DataItem, BI.Persist, BI.DataSet,
+  VCLBI.Grid, Data.DB;
+
+type
+  TMasterDetailForm = class(TForm)
+    BIGrid1: TBIGrid;  // Master grid
+    BIGrid2: TBIGrid;  // Detail grid
+    DataSource1: TDataSource;
+    DataSource2: TDataSource;
+    Master: TBIDataSet;
+    Detail: TBIDataSet;
+    Splitter1: TSplitter;
+    procedure FormShow(Sender: TObject);
+  end;
+
+procedure TMasterDetailForm.FormShow(Sender: TObject);
+var
+  Data: TDataItem;
+begin
+  // Load database with relationships
+  Data := TStore.Load('SQLite_Demo');
+
+  // Setup master dataset
+  Master.Data := Data['Products'];
+  Master.Open;
+
+  // Setup detail dataset (automatically linked)
+  Detail.Data := Data['"Order Details"'];
+  Detail.Open;
+
+  // Grids automatically show master-detail relationship
+  BIGrid1.Data := Master.Data;
+  BIGrid2.Data := Detail.Data;
+end;
+```
+
+## Master-Detail with Chart
+
+```pascal
+uses
+  BI.DataSet, VCLBI.Chart, VCLBI.Grid;
+
+type
+  TForm1 = class(TForm)
+    BIGrid1: TBIGrid;    // Master
+    BIGrid2: TBIGrid;    // Detail  
+    BIChart1: TBIChart;  // Detail chart
+    Master: TBIDataSet;
+    Detail: TBIDataSet;
+    procedure FormShow(Sender: TObject);
+    procedure DetailAfterRefresh(DataSet: TDataSet);
+  end;
+
+procedure TForm1.FormShow(Sender: TObject);
+var
+  Data: TDataItem;
+begin
+  Data := TStore.Load('SQLite_Demo');
+
+  Master.Data := Data['Products'];
+  Master.Open;
+
+  Detail.Data := Data['"Order Details"'];
+  Detail.Open;
+
+  BIGrid1.Data := Master.Data;
+  BIGrid2.Data := Detail.Data;
+end;
+
+procedure TForm1.DetailAfterRefresh(DataSet: TDataSet);
+begin
+  // Update chart when detail changes
+  BIChart1.Clear;
+  BIChart1.Fill(Detail.Cursor);
+end;
+```
+
+## Accessing Related Data
+
+```pascal
+uses BI.SQL;
+
+// Query master with detail data
+var Result: TDataItem;
+begin
+  Result := TBISQL.From(Orders,
+    'OrderID, OrderDate, Customers.CompanyName, Customers.Country');
+  // Access related Customers table using dot notation
+end;
+
+// Multi-level relationships
+Result := TBISQL.From(OrderDetails,
+  '"Order Details".OrderID, ' +
+  'Orders.OrderDate, ' +
+  'Products.ProductName, ' +
+  'Products.Suppliers.CompanyName');
+```
+
+## Manual Relationships
+
+```pascal
+uses BI.DataItem;
+
+// Create relationship manually
+procedure CreateRelationship;
+var
+  Master, Detail: TDataItem;
+  Relation: TDataRelation;
+begin
+  Master := TDataItem.Create(True);
+  Detail := TDataItem.Create(True);
+
+  // Define master-detail relationship
+  Relation := TDataRelation.Create;
+  Relation.Detail := Detail;
+  Relation.DetailColumn := Detail['MasterID'];
+  Relation.MasterColumn := Master['ID'];
+
+  Master.Relations.Add(Relation);
+end;
+```
+
+## Foreign Keys
+
+```pascal
+// TeeBI automatically detects foreign keys when importing from databases
+
+// Manual foreign key
+var
+  ForeignKey: TForeignKey;
+begin
+  ForeignKey := TForeignKey.Create;
+  ForeignKey.Table := Orders;
+  ForeignKey.Column := Orders['CustomerID'];
+  ForeignKey.References := Customers['ID'];
+
+  Orders.ForeignKeys.Add(ForeignKey);
+end;
+```
+
+## Complete Example
+
+```pascal
+uses
+  BI.DataItem, BI.Persist, BI.DataSet,
+  VCLBI.Grid, VCLBI.Chart,
+  Data.DB, Vcl.StdCtrls;
+
+type
+  TMasterDetailDemo = class(TForm)
+    // Master
+    BIGrid1: TBIGrid;
+    DataSource1: TDataSource;
+    Master: TBIDataSet;
+    Panel1: TPanel;
+    CheckBoxMaster: TCheckBox;
+
+    // Detail
+    BIGrid2: TBIGrid;
+    DataSource2: TDataSource;
+    Detail: TBIDataSet;
+    Panel2: TPanel;
+    CheckBoxDetail: TCheckBox;
+
+    // Chart
+    BIChart1: TBIChart;
+    Splitter1: TSplitter;
+    Splitter2: TSplitter;
+
+    procedure FormShow(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure CheckBoxMasterClick(Sender: TObject);
+    procedure CheckBoxDetailClick(Sender: TObject);
+    procedure DetailAfterRefresh(DataSet: TDataSet);
+  private
+    Data: TDataItem;
+  end;
+
+procedure TMasterDetailDemo.FormShow(Sender: TObject);
+begin
+  // Load database (includes relationships)
+  Data := TStore.Load('SQLite_Demo');
+
+  // Master: Products
+  Master.Data := Data['Products'];
+  Master.Open;
+  CheckBoxMaster.Checked := True;
+
+  // Detail: Order Details (related to Products)
+  Detail.Data := Data['"Order Details"'];
+  Detail.Open;
+  CheckBoxDetail.Checked := True;
+
+  // Display in grids
+  BIGrid1.Data := Master.Data;
+  BIGrid2.Data := Detail.Data;
+end;
+
+procedure TMasterDetailDemo.CheckBoxMasterClick(Sender: TObject);
+begin
+  Master.Active := CheckBoxMaster.Checked;
+end;
+
+procedure TMasterDetailDemo.CheckBoxDetailClick(Sender: TObject);
+begin
+  Detail.Active := CheckBoxDetail.Checked;
+end;
+
+procedure TMasterDetailDemo.DetailAfterRefresh(DataSet: TDataSet);
+begin
+  // Update chart when master selection changes
+  BIChart1.Clear;
+  BIChart1.Fill(Detail.Cursor);
+end;
+
+procedure TMasterDetailDemo.FormDestroy(Sender: TObject);
+begin
+  Data.Free;
+end;
+```
+
+## Three-Level Hierarchy
+
+```pascal
+// Customers -> Orders -> Order Details
+type
+  TForm1 = class(TForm)
+    BIGrid1: TBIGrid;  // Customers
+    BIGrid2: TBIGrid;  // Orders
+    BIGrid3: TBIGrid;  // Order Details
+    Customers: TBIDataSet;
+    Orders: TBIDataSet;
+    OrderDetails: TBIDataSet;
+    procedure FormShow(Sender: TObject);
+  end;
+
+procedure TForm1.FormShow(Sender: TObject);
+var
+  Data: TDataItem;
+begin
+  Data := TStore.Load('SQLite_Demo');
+
+  // Level 1: Customers
+  Customers.Data := Data['Customers'];
+  Customers.Open;
+
+  // Level 2: Orders (linked to Customers)
+  Orders.Data := Data['Orders'];
+  Orders.Open;
+
+  // Level 3: Order Details (linked to Orders)
+  OrderDetails.Data := Data['"Order Details"'];
+  OrderDetails.Open;
+
+  BIGrid1.Data := Customers.Data;
+  BIGrid2.Data := Orders.Data;
+  BIGrid3.Data := OrderDetails.Data;
+end;
+```
+
+## Nested Grids
+
+```pascal
+// Show detail grid inside master grid row
+uses VCLBI.Grid;
+
+procedure ShowNestedDetail;
+begin
+  // BIGrid automatically shows detail grids for sub-tables
+  BIGrid1.Data := Data['Customers'];
+  
+  // Access sub-tables
+  var SubTable := Data['Customers']['Orders'];
+  BIGrid2.Data := SubTable;
+end;
+```
+
+## Filtering Master-Detail
+
+```pascal
+uses BI.Expression;
+
+// Filter master affects detail automatically
+procedure FilterMaster;
+var
+  Filter: TExpression;
+begin
+  Filter := TDataFilter.FromString(
+    Master.Data,
+    'Category = "Beverages"',
+    nil
+  );
+
+  if Filter <> nil then
+  try
+    BIGrid1.Filter := Filter;
+    // Detail grid automatically updates
+  finally
+    Filter.Free;
+  end;
+end;
+```
+
+## Aggregating Detail Data
+
+```pascal
+uses BI.SQL;
+
+// Show master with aggregated detail
+var Result: TDataItem;
+begin
+  Result := TBISQL.From(Orders,
+    'Customers.CompanyName, ' +
+    'count("Order Details".OrderID) as TotalOrders, ' +
+    'sum("Order Details".Quantity * "Order Details".UnitPrice) as TotalRevenue ' +
+    'group by Customers.CompanyName');
+
+  BIGrid1.Data := Result;
+end;
+```
+
+## Performance Tips
+
+<AccordionGroup>
+  <Accordion title="Index Foreign Keys">
+    Create indexes on foreign key columns:
+    ```pascal
+    Orders['CustomerID'].CreateIndex;
+    ```
+  </Accordion>
+  
+  <Accordion title="Lazy Loading">
+    Load detail data only when needed:
+    ```pascal
+    Detail.Active := False;  // Start disabled
+    // Activate when master row selected
+    ```
+  </Accordion>
+  
+  <Accordion title="Limit Detail Rows">
+    Use TOP to limit detail records:
+    ```pascal
+    DetailData := TBISQL.From(AllDetails,
+      'top 100 * where MasterID = ' + MasterID.ToString);
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+- [Importing Data](/examples/importing-data) - Import related tables
+- [SQL Queries](/examples/sql-queries) - Query across relationships
+- [Grids](/examples/grids) - Display hierarchical data
+- [Charts](/examples/charts) - Visualize detail data

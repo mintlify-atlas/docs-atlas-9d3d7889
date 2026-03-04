@@ -1,0 +1,362 @@
+---
+title: Compression
+description: Compress data streams with pluggable compression engines
+---
+
+## Overview
+
+TeeBI provides a flexible compression system through the `TCompression` class with pluggable compression engines. Compression is essential for:
+
+- Reducing file sizes for storage
+- Faster network transmission
+- Efficient binary stream persistence
+- Web server data transfer
+
+## Default Compression Engine
+
+By default, TeeBI uses `System.Zip` from the Delphi RTL:
+
+```pascal
+uses BI.Compression;
+
+// Default plugin is TSystemCompression (System.Zip)
+var Stream: TStream;
+    Compressed: TMemoryStream;
+begin
+  Stream := TMemoryStream.Create;
+  // ... populate Stream ...
+  
+  // Compress
+  Compressed := TCompression.Compress(Stream, 'data');
+end;
+```
+
+## Compression Plugins
+
+TeeBI supports multiple compression engines through a plugin architecture.
+
+### Available Plugins
+
+1. **TSystemCompression** - Default, uses `System.Zip` (Delphi RTL)
+2. **TSynZipCompression** - mORMot SynZip engine
+3. **TSynLZCompression** - mORMot SynLZ engine (faster)
+4. **TSnappyCompression** - Google Snappy (x64 only)
+
+## Switching Compression Engines
+
+### Using SynLZ (Recommended for Speed)
+
+```pascal
+uses BI.Compression, BI.Compression.SynZip;
+
+// Switch to SynLZ
+TCompression.Plugin := TSynLZCompression;
+
+// Now all compression uses SynLZ
+var Compressed := TCompression.Compress(MyStream, 'data');
+
+// Restore default
+TCompression.Plugin := TSystemCompression;
+```
+
+### Using SynZip
+
+```pascal
+uses BI.Compression, BI.Compression.SynZip;
+
+TCompression.Plugin := TSynZipCompression;
+```
+
+### Using Snappy (x64 only)
+
+```pascal
+uses BI.Compression, BI.Compression.Snappy;
+
+// Only works on x64 builds
+TCompression.Plugin := TSnappyCompression;
+```
+
+From `BI.Compression.Snappy.pas:11-13`:
+```pascal
+{$IFNDEF CPUX64}
+{$MESSAGE FATAL 'Snappy works only with x64 bits CPU'}
+{$ENDIF}
+```
+
+## Basic Usage
+
+### Compressing a Stream
+
+```pascal
+uses BI.Compression;
+
+var
+  Source: TMemoryStream;
+  Compressed: TMemoryStream;
+begin
+  Source := TMemoryStream.Create;
+  try
+    // ... populate Source ...
+    
+    Compressed := TCompression.Compress(Source, 'mydata');
+    try
+      // Use or save Compressed
+      Compressed.SaveToFile('data.zip');
+    finally
+      Compressed.Free;
+    end;
+  finally
+    Source.Free;
+  end;
+end;
+```
+
+### Decompressing a Stream
+
+```pascal
+var
+  Compressed: TMemoryStream;
+  Decompressed: TMemoryStream;
+begin
+  Compressed := TMemoryStream.Create;
+  try
+    Compressed.LoadFromFile('data.zip');
+    
+    Decompressed := TCompression.DeCompress(Compressed, 'mydata');
+    try
+      // Use Decompressed
+    finally
+      Decompressed.Free;
+    end;
+  finally
+    Compressed.Free;
+  end;
+end;
+```
+
+### Decompressing ZIP Files
+
+```pascal
+uses BI.Compression, BI.Arrays.Strings;
+
+var
+  Files: TStringArray;
+begin
+  // Extract all files from ZIP to temp folder
+  Files := TCompression.DeCompress('archive.zip');
+  
+  // Process extracted files
+  for var FileName in Files do
+    ProcessFile(FileName);
+end;
+```
+
+## Plugin Architecture
+
+From `BI.Compression.pas:48-74`:
+
+```pascal
+TCompressionPlugin = class abstract
+public
+  function Compress(const AStream: TStream; 
+                    const AName: String): TMemoryStream; virtual; abstract;
+  
+  function DeCompress(const AStream: TStream; 
+                      const AName: String): TMemoryStream; virtual; abstract;
+  
+  function DeCompress(const AFileName: String;
+                      const APassword: String = '';
+                      const AError: TCompressionError = nil): TStringArray; virtual; abstract;
+end;
+
+TCompression = record
+public
+  class function Compress(const AStream: TStream; 
+                          const AName: String): TMemoryStream; static;
+  
+  class function DeCompress(const AStream: TStream; 
+                            const AName: String): TMemoryStream; static;
+  
+  class function DeCompress(const AFileName: String;
+                            const APassword: String = '';
+                            const AError: TCompressionError = nil): TStringArray; static;
+  
+  class property Plugin: TCompressionPluginClass read GetPlugin write SetPlugin;
+end;
+```
+
+## Compression Engine Comparison
+
+### System.Zip (Default)
+
+**Pros:**
+- Built into Delphi RTL
+- No external dependencies
+- Standard ZIP format
+- Supports encrypted ZIPs (Delphi 10.2+)
+
+**Cons:**
+- Slower than alternatives
+- Larger compressed size
+
+### SynLZ (mORMot)
+
+**Pros:**
+- Very fast compression/decompression
+- Low CPU overhead
+- Smaller memory footprint
+- Excellent for real-time compression
+
+**Cons:**
+- Requires mORMot library
+- Proprietary format (not standard ZIP)
+- Lower compression ratio than ZIP
+
+### SynZip (mORMot)
+
+**Pros:**
+- Faster than System.Zip
+- Standard ZIP format
+- Good compression ratio
+
+**Cons:**
+- Requires mORMot library
+- Slower than SynLZ
+
+### Snappy (Google)
+
+**Pros:**
+- Extremely fast decompression
+- Predictable performance
+- Good for streaming data
+
+**Cons:**
+- x64 only
+- Requires Snappy library
+- Proprietary format
+- Lower compression ratio
+
+## Web Server Compression
+
+The TeeBI Web Server uses compression transparently:
+
+```pascal
+uses BI.Web;
+
+var
+  Client: TBIWebClient;
+  Data: TDataItem;
+begin
+  Client := TBIWebClient.Create('server.com', 15015);
+  try
+    // Compression is recommended for web transfer
+    Client.Compress := TWebCompression.Yes;
+    
+    // Data is compressed during transfer
+    Data := Client.Load('Customers', TWebCompression.Yes);
+  finally
+    Client.Free;
+  end;
+end;
+```
+
+From `BI.Web.pas:370-382`:
+
+```pascal
+function TBIWebClient.GetDataStream(const Data: String; 
+                                     const Children: Boolean; 
+                                     const Compress: TWebCompression): TStream;
+var tmp: String;
+begin
+  if Compress = TWebCompression.Yes then
+    tmp := '&zip=1'
+  else
+    tmp := '';
+  
+  if Children then
+    tmp := tmp + '&children=1';
+  
+  result := GetStream('data=' + Data + tmp);
+end;
+```
+
+## Important Notes
+
+### Client-Server Compatibility
+
+From `BI.Compression.SynZip.pas:31-37`:
+
+> Both sides of the communication (client and server) must use the same compression plugin.
+
+If server uses SynLZ, clients must also use SynLZ:
+
+```pascal
+// Server and client must match
+TCompression.Plugin := TSynLZCompression;
+```
+
+### Password-Protected ZIPs
+
+Encrypted ZIP support requires Delphi 10.2 (Tokyo) or later:
+
+```pascal
+{$IF CompilerVersion >= 31}
+{$DEFINE ENCRYPTEDZIP}
+{$ENDIF}
+```
+
+### Memory Considerations
+
+Compression creates temporary memory streams. For very large datasets:
+
+1. Monitor memory usage
+2. Consider streaming compression (process in chunks)
+3. Free compressed streams promptly
+
+## Best Practices
+
+1. **Choose Based on Need:**
+   - **Speed**: Use SynLZ
+   - **Compatibility**: Use System.Zip
+   - **Balance**: Use SynZip
+
+2. **Web Transfer**: Always enable compression
+
+3. **Large Files**: Stream data in chunks when possible
+
+4. **Testing**: Benchmark with your actual data
+
+5. **Consistency**: Use same plugin on client and server
+
+## Example: Custom Plugin
+
+Create your own compression plugin:
+
+```pascal
+uses BI.Compression;
+
+type
+  TMyCompression = class(TCompressionPlugin)
+  public
+    function Compress(const AStream: TStream; 
+                      const AName: String): TMemoryStream; override;
+    function DeCompress(const AStream: TStream; 
+                        const AName: String): TMemoryStream; override;
+    function DeCompress(const AFileName: String;
+                        const APassword: String = '';
+                        const AError: TCompressionError = nil): TStringArray; override;
+  end;
+
+// Implement methods...
+
+// Activate
+TCompression.Plugin := TMyCompression;
+```
+
+## Related Topics
+
+- [Web Server](/advanced/web-server)
+- [Performance Optimization](/advanced/performance)
+- [Big Data Support](/advanced/big-data)
+- [Importing Data](/import/overview)
+- [Exporting Data](/export/overview)

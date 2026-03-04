@@ -1,0 +1,501 @@
+---
+title: Web Server
+description: Serve data over HTTP with TeeBI Web Server for remote data access
+---
+
+TeeBI includes a built-in web server for serving data over HTTP, enabling remote access and web-based dashboards.
+
+## Basic Web Server
+
+```pascal
+uses
+  BI.Web.Server.Indy, BI.Web.Context;
+
+type
+  TWebServerForm = class(TForm)
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+  private
+    Server: THttpServer;
+    procedure HandleRequest(const Context: TWebContext);
+  end;
+
+procedure TWebServerForm.FormCreate(Sender: TObject);
+begin
+  // Create HTTP server (uses Indy)
+  Server := THttpServer.Create(Self);
+  Server.Port := 15015;
+  Server.OnCommandGet := HandleRequest;
+  Server.Active := True;
+
+  ShowMessage('Server started on port 15015');
+end;
+
+procedure TWebServerForm.HandleRequest(const Context: TWebContext);
+begin
+  // Handle HTTP GET request
+  Context.Response.ContentText := 'Hello from TeeBI Web Server';
+  Context.Response.ContentType := 'text/plain';
+end;
+
+procedure TWebServerForm.FormDestroy(Sender: TObject);
+begin
+  Server.Active := False;
+  Server.Free;
+end;
+```
+
+## Serve Data as JSON
+
+```pascal
+uses
+  BI.DataItem, BI.Persist, BI.JSON, BI.Web.Context;
+
+procedure HandleDataRequest(const Context: TWebContext);
+var
+  Data: TDataItem;
+  JSON: String;
+begin
+  // Load data
+  Data := TStore.Load('BISamples', 'Products');
+  try
+    // Convert to JSON
+    JSON := TBIJSONExport.AsString(Data);
+    
+    // Return JSON response
+    Context.Response.ContentText := JSON;
+    Context.Response.ContentType := 'application/json';
+  finally
+    Data.Free;
+  end;
+end;
+```
+
+## Query Parameters
+
+```pascal
+uses
+  BI.SQL, BI.Web.Context;
+
+procedure HandleQueryRequest(const Context: TWebContext);
+var
+  Data, Result: TDataItem;
+  Category, JSON: String;
+begin
+  // Get query parameter: /data?category=Electronics
+  Category := Context.Request.Params.Values['category'];
+  
+  Data := TStore.Load('BISamples', 'Products');
+  try
+    // Apply filter if category provided
+    if Category <> '' then
+      Result := TBISQL.From(Data, 
+        'ProductName, UnitPrice where Category = "' + Category + '"')
+    else
+      Result := Data;
+    
+    try
+      JSON := TBIJSONExport.AsString(Result);
+      Context.Response.ContentText := JSON;
+      Context.Response.ContentType := 'application/json';
+    finally
+      if Result <> Data then
+        Result.Free;
+    end;
+  finally
+    Data.Free;
+  end;
+end;
+```
+
+## URL Routing
+
+```pascal
+uses
+  System.SysUtils, BI.Web.Context;
+
+procedure HandleRequest(const Context: TWebContext);
+var
+  Path: String;
+begin
+  Path := Context.Request.Document;
+  
+  if Path = '/products' then
+    ServeProducts(Context)
+  else if Path = '/customers' then
+    ServeCustomers(Context)
+  else if StartsText('/query/', Path) then
+    HandleQuery(Context)
+  else
+  begin
+    Context.Response.ContentText := 'Not Found';
+    Context.Response.ResponseNo := 404;
+  end;
+end;
+```
+
+## Binary Data Format
+
+```pascal
+uses
+  BI.Persist, System.Classes;
+
+// Serve data in TeeBI binary format (faster, compressed)
+procedure ServeBinaryData(const Context: TWebContext);
+var
+  Data: TDataItem;
+  Stream: TMemoryStream;
+begin
+  Data := TStore.Load('BISamples', 'Products');
+  try
+    Stream := TMemoryStream.Create;
+    try
+      // Save to binary stream
+      TDataItemPersistence.SaveToStream(Data, Stream);
+      
+      Stream.Position := 0;
+      Context.Response.ContentStream := Stream;
+      Context.Response.ContentType := 'application/octet-stream';
+    except
+      Stream.Free;
+      raise;
+    end;
+  finally
+    Data.Free;
+  end;
+end;
+```
+
+## CORS Support
+
+```pascal
+uses BI.Web.Context;
+
+// Enable Cross-Origin Resource Sharing
+procedure EnableCORS(const Context: TWebContext);
+begin
+  with Context.Response.CustomHeaders do
+  begin
+    Add('Access-Control-Allow-Origin=*');
+    Add('Access-Control-Allow-Methods=GET, POST, OPTIONS');
+    Add('Access-Control-Allow-Headers=Content-Type');
+  end;
+end;
+
+procedure HandleWithCORS(const Context: TWebContext);
+begin
+  EnableCORS(Context);
+  
+  if Context.Request.Method = 'OPTIONS' then
+  begin
+    // Preflight request
+    Context.Response.ResponseNo := 200;
+    Exit;
+  end;
+  
+  // Handle actual request
+  HandleDataRequest(Context);
+end;
+```
+
+## Complete Web Server Example
+
+```pascal
+uses
+  BI.DataItem, BI.Persist, BI.SQL, BI.JSON,
+  BI.Web.Server.Indy, BI.Web.Context,
+  System.SysUtils, System.Classes;
+
+type
+  TBIWebServer = class(TForm)
+    MemoLog: TMemo;
+    BtnStart: TButton;
+    BtnStop: TButton;
+    EditPort: TEdit;
+    LabelStatus: TLabel;
+    LabelConnections: TLabel;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure BtnStartClick(Sender: TObject);
+    procedure BtnStopClick(Sender: TObject);
+  private
+    Server: THttpServer;
+    Data: TDataItem;
+    
+    procedure LoadData;
+    procedure HandleRequest(const Context: TWebContext);
+    procedure HandleConnect(const Context: TWebContext);
+    procedure HandleDisconnect(const Context: TWebContext);
+    procedure HandleException(const Context: TWebContext; const E: Exception);
+    procedure UpdateStatus;
+    
+    procedure ServeProductList(const Context: TWebContext);
+    procedure ServeProductQuery(const Context: TWebContext);
+    procedure ServeStatistics(const Context: TWebContext);
+  end;
+
+procedure TBIWebServer.FormCreate(Sender: TObject);
+begin
+  EditPort.Text := '15015';
+  LoadData;
+end;
+
+procedure TBIWebServer.LoadData;
+begin
+  Data := TStore.Load('BISamples', 'Products');
+  MemoLog.Lines.Add('Data loaded: ' + IntToStr(Data.Count) + ' products');
+end;
+
+procedure TBIWebServer.BtnStartClick(Sender: TObject);
+begin
+  if Server <> nil then Exit;
+  
+  try
+    Server := THttpServer.Create(Self);
+    Server.Port := StrToInt(EditPort.Text);
+    Server.OnCommandGet := HandleRequest;
+    Server.OnConnect := HandleConnect;
+    Server.OnDisconnect := HandleDisconnect;
+    Server.OnException := HandleException;
+    Server.Active := True;
+    
+    UpdateStatus;
+    MemoLog.Lines.Add('Server started on port ' + EditPort.Text);
+    MemoLog.Lines.Add('Try: http://localhost:' + EditPort.Text + '/products');
+  except
+    on E: Exception do
+    begin
+      MemoLog.Lines.Add('Error starting server: ' + E.Message);
+      Server.Free;
+      Server := nil;
+    end;
+  end;
+end;
+
+procedure TBIWebServer.BtnStopClick(Sender: TObject);
+begin
+  if Server = nil then Exit;
+  
+  Server.Active := False;
+  Server.Free;
+  Server := nil;
+  
+  UpdateStatus;
+  MemoLog.Lines.Add('Server stopped');
+end;
+
+procedure TBIWebServer.HandleRequest(const Context: TWebContext);
+var
+  Path: String;
+begin
+  Path := Context.Request.Document;
+  
+  MemoLog.Lines.Add('Request: ' + Path);
+  
+  // Enable CORS
+  with Context.Response.CustomHeaders do
+  begin
+    Add('Access-Control-Allow-Origin=*');
+    Add('Access-Control-Allow-Methods=GET');
+  end;
+  
+  // Route to handlers
+  if Path = '/products' then
+    ServeProductList(Context)
+  else if StartsText('/query', Path) then
+    ServeProductQuery(Context)
+  else if Path = '/stats' then
+    ServeStatistics(Context)
+  else
+  begin
+    Context.Response.ContentText := 
+      '{"error": "Not Found", "path": "' + Path + '"}';
+    Context.Response.ContentType := 'application/json';
+    Context.Response.ResponseNo := 404;
+  end;
+end;
+
+procedure TBIWebServer.ServeProductList(const Context: TWebContext);
+var
+  JSON: String;
+begin
+  JSON := TBIJSONExport.AsString(Data);
+  Context.Response.ContentText := JSON;
+  Context.Response.ContentType := 'application/json';
+end;
+
+procedure TBIWebServer.ServeProductQuery(const Context: TWebContext);
+var
+  Category, SQL, JSON: String;
+  Result: TDataItem;
+begin
+  // GET /query?category=Electronics
+  Category := Context.Request.Params.Values['category'];
+  
+  if Category <> '' then
+    SQL := 'ProductName, UnitPrice, Stock where Category = "' + Category + '"'
+  else
+    SQL := 'ProductName, UnitPrice, Stock';
+  
+  Result := TBISQL.From(Data, SQL);
+  try
+    JSON := TBIJSONExport.AsString(Result);
+    Context.Response.ContentText := JSON;
+    Context.Response.ContentType := 'application/json';
+  finally
+    Result.Free;
+  end;
+end;
+
+procedure TBIWebServer.ServeStatistics(const Context: TWebContext);
+var
+  Result: TDataItem;
+  JSON: String;
+begin
+  // Return aggregated statistics
+  Result := TBISQL.From(Data,
+    'Category, count(*) as Count, sum(Stock) as TotalStock, ' +
+    'avg(UnitPrice) as AvgPrice group by Category');
+  try
+    JSON := TBIJSONExport.AsString(Result);
+    Context.Response.ContentText := JSON;
+    Context.Response.ContentType := 'application/json';
+  finally
+    Result.Free;
+  end;
+end;
+
+procedure TBIWebServer.HandleConnect(const Context: TWebContext);
+begin
+  UpdateStatus;
+end;
+
+procedure TBIWebServer.HandleDisconnect(const Context: TWebContext);
+begin
+  UpdateStatus;
+end;
+
+procedure TBIWebServer.HandleException(const Context: TWebContext; 
+  const E: Exception);
+begin
+  MemoLog.Lines.Add('Exception: ' + E.Message);
+  Context.Response.ContentText := 
+    '{"error": "' + E.Message + '"}';
+  Context.Response.ContentType := 'application/json';
+  Context.Response.ResponseNo := 500;
+end;
+
+procedure TBIWebServer.UpdateStatus;
+begin
+  if Server <> nil then
+  begin
+    LabelStatus.Caption := 'Running';
+    LabelConnections.Caption := 'Connections: ' + 
+      IntToStr(Server.ContextsCount);
+    BtnStart.Enabled := False;
+    BtnStop.Enabled := True;
+  end
+  else
+  begin
+    LabelStatus.Caption := 'Stopped';
+    LabelConnections.Caption := 'Connections: 0';
+    BtnStart.Enabled := True;
+    BtnStop.Enabled := False;
+  end;
+end;
+
+procedure TBIWebServer.FormDestroy(Sender: TObject);
+begin
+  if Server <> nil then
+  begin
+    Server.Active := False;
+    Server.Free;
+  end;
+  Data.Free;
+end;
+```
+
+## Client-Side Access
+
+### JavaScript Client
+
+```javascript
+// Fetch data from TeeBI server
+async function fetchProducts() {
+  const response = await fetch('http://localhost:15015/products');
+  const data = await response.json();
+  console.log(data);
+}
+
+// Query with parameters
+async function queryByCategory(category) {
+  const response = await fetch(
+    `http://localhost:15015/query?category=${category}`
+  );
+  const data = await response.json();
+  return data;
+}
+
+// Get statistics
+async function getStats() {
+  const response = await fetch('http://localhost:15015/stats');
+  const data = await response.json();
+  return data;
+}
+```
+
+### Delphi Client
+
+```pascal
+uses
+  BI.DataSource, BI.JSON;
+
+// Load data from remote server
+var Data: TDataItem;
+begin
+  Data := TBIURLSource.From('http://server:15015/products');
+  try
+    BIGrid1.Data := Data;
+  finally
+    // Data owned by grid
+  end;
+end;
+```
+
+## Performance Tips
+
+<CardGroup cols={2}>
+  <Card title="Binary Format" icon="bolt">
+    Use TeeBI binary format for 10x faster transfers than JSON
+  </Card>
+  <Card title="Compression" icon="file-zipper">
+    Enable compression for large responses:
+    ```pascal
+    Context.Response.Compress := True;
+    ```
+  </Card>
+  <Card title="Caching" icon="database">
+    Cache frequently accessed data in memory
+  </Card>
+  <Card title="Connection Pooling" icon="diagram-project">
+    Reuse data connections across requests
+  </Card>
+</CardGroup>
+
+## Security Considerations
+
+<Warning>
+  The basic web server is for internal/development use. For production:
+  - Implement authentication (JWT, OAuth)
+  - Use HTTPS/TLS encryption
+  - Validate and sanitize all inputs
+  - Implement rate limiting
+  - Use a reverse proxy (nginx, Apache)
+</Warning>
+
+## See Also
+
+- [Importing Data](/examples/importing-data) - Load data from URLs
+- [SQL Queries](/examples/sql-queries) - Process web requests
+- [Big Data](/examples/big-data) - Serve large datasets
+- [Parallel Processing](/examples/parallel-processing) - Handle concurrent requests

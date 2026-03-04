@@ -1,0 +1,454 @@
+---
+title: Pivot Tables
+description: Create multi-dimensional pivot tables and cross-tabulations
+---
+
+TeeBI pivot tables (summaries) provide Excel-like multi-dimensional data analysis.
+
+## Basic Pivot Table
+
+```pascal
+uses
+  BI.DataItem, BI.Summary, BI.Persist,
+  VCLBI.Grid;
+
+type
+  TForm1 = class(TForm)
+    BIGrid1: TBIGrid;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+  private
+    Data, PivotResult: TDataItem;
+    Summary: TSummary;
+  end;
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  // Load data
+  Data := TStore.Load('SQLite_Demo');
+
+  // Create pivot/summary
+  Summary := TSummary.Create(Self);
+  Summary.Data := Data['Orders'];
+
+  // Rows (dimensions)
+  Summary.By.Add(Data['Customers']['Country']);
+  Summary.By.Add(Data['Orders']['OrderDate']).Part := dpYear;
+
+  // Columns (measures)
+  Summary.Measures.Add(Data['"Order Details"']['Quantity']).Aggregate := agSum;
+  Summary.Measures.Add(Data['"Order Details"']['UnitPrice']).Aggregate := agAverage;
+
+  // Calculate
+  PivotResult := TDataItem.Create(Summary);
+
+  // Display
+  BIGrid1.Data := PivotResult;
+end;
+
+procedure TForm1.FormDestroy(Sender: TObject);
+begin
+  PivotResult.Free;
+  Data.Free;
+  Summary.Free;
+end;
+```
+
+## Multi-Level Pivot
+
+```pascal
+// Create hierarchical pivot with 3 levels
+Summary := TSummary.Create(Self);
+try
+  Summary.Data := Sales;
+
+  // Three dimension levels
+  Summary.By.Add(Sales['Region']);        // Level 1
+  Summary.By.Add(Sales['Country']);       // Level 2
+  Summary.By.Add(Sales['City']);          // Level 3
+
+  // Multiple measures
+  Summary.Measures.Add(Sales['Revenue']).Aggregate := agSum;
+  Summary.Measures.Add(Sales['Quantity']).Aggregate := agSum;
+  Summary.Measures.Add(Sales['OrderCount']).Aggregate := agCount;
+
+  Result := TDataItem.Create(Summary);
+  BIGrid1.Data := Result;
+finally
+  Summary.Free;
+end;
+```
+
+## Time-based Pivot
+
+```pascal
+uses BI.DataItem;
+
+// Pivot by date parts
+Summary := TSummary.Create(Self);
+try
+  Summary.Data := Orders;
+
+  // Year, Quarter, Month hierarchy
+  with Summary.By.Add(Orders['OrderDate']) do
+  begin
+    Part := dpYear;
+    Name := 'Year';
+  end;
+
+  with Summary.By.Add(Orders['OrderDate']) do
+  begin
+    Part := dpQuarter;
+    Name := 'Quarter';
+  end;
+
+  with Summary.By.Add(Orders['OrderDate']) do
+  begin
+    Part := dpMonth;
+    Name := 'Month';
+  end;
+
+  Summary.Measures.Add(Orders['TotalAmount']).Aggregate := agSum;
+
+  Result := TDataItem.Create(Summary);
+  BIGrid1.Data := Result;
+finally
+  Summary.Free;
+end;
+```
+
+## Pivot with Totals
+
+```pascal
+uses BI.Summary.Totals;
+
+// Show grand totals and subtotals
+procedure ShowPivotWithTotals;
+var
+  MainSummary, TotalsSummary: TSummary;
+  MainData, TotalsData: TDataItem;
+begin
+  // Create main pivot
+  MainSummary := TSummary.Create(Self);
+  try
+    MainSummary.Data := Orders;
+    MainSummary.By.Add(Orders['Category']);
+    MainSummary.By.Add(Orders['Year']);
+    MainSummary.Measures.Add(Orders['Sales']).Aggregate := agSum;
+
+    MainData := TDataItem.Create(MainSummary);
+    BIGridMain.Data := MainData;
+
+    // Create totals summary
+    TotalsSummary := TSummaryTotals.CreateSummary(Self, MainSummary);
+    try
+      TotalsData := TDataItem.Create(TotalsSummary);
+      BIGridTotals.Data := TotalsData;
+    finally
+      TotalsSummary.Free;
+    end;
+  finally
+    MainSummary.Free;
+  end;
+end;
+```
+
+## Hide Duplicate Values
+
+```pascal
+// Hide repeated dimension values for cleaner display
+procedure HideDuplicates;
+var
+  I: Integer;
+begin
+  if Summary <> nil then
+  begin
+    for I := 0 to High(Summary.By) do
+      if Summary.By[I].DestData <> nil then
+        BIGrid1.Duplicates(Summary.By[I].DestData, True);
+  end;
+end;
+```
+
+## Colorize Pivot Values
+
+```pascal
+procedure ColorizePivot;
+var
+  Colorizers: TDataColorizers;
+  I: Integer;
+begin
+  SetLength(Colorizers, Summary.Measures.Count);
+
+  for I := 0 to Summary.Measures.Count - 1 do
+  begin
+    Colorizers[I].Data := Summary.Measures[I].DestData;
+    Colorizers[I].Colors.Inverted := False;
+    Colorizers[I].TextColor := TColorizeTextColor.Automatic;
+    Colorizers[I].Mode := TColorizeMode.Full;
+
+    // Custom colors for each measure
+    if I > 0 then
+    begin
+      Colorizers[I].Colors.Clear;
+      Colorizers[I].Colors.Add(0, clWhite);
+      Colorizers[I].Colors.Add(1, clNavy);
+    end;
+  end;
+
+  BIGrid1.Colorize(Colorizers);
+end;
+```
+
+## Pivot with Filtering
+
+```pascal
+uses BI.Expression;
+
+// Apply filter before pivoting
+Summary := TSummary.Create(Self);
+try
+  Summary.Data := Orders;
+
+  // Set filter expression
+  Summary.Filter := TDataFilter.FromString(
+    Orders,
+    '(OrderDate >= "2024-01-01") and (Status = "Completed")',
+    nil
+  );
+
+  Summary.By.Add(Orders['Region']);
+  Summary.Measures.Add(Orders['Revenue']).Aggregate := agSum;
+
+  Result := TDataItem.Create(Summary);
+  BIGrid1.Data := Result;
+finally
+  Summary.Free;
+end;
+```
+
+## Summary Editor
+
+```pascal
+uses VCLBI.Editor.Summary;
+
+// Interactive pivot editor
+var
+  Editor: TSummaryEditor;
+begin
+  Editor := TSummaryEditor.Create(Self);
+  Editor.OnRecalculate := RecalculateSummary;
+  Editor.Parent := Panel1;  // Embedd in panel
+  Editor.Refresh(Summary);
+end;
+
+procedure TForm1.RecalculateSummary(Sender: TObject);
+begin
+  PivotResult.Free;
+  PivotResult := TDataItem.Create(Summary);
+  BIGrid1.Data := PivotResult;
+end;
+```
+
+## Aggregate Functions
+
+```pascal
+// All available aggregates
+with Summary.Measures.Add(Data['Field']) do
+  Aggregate := agSum;       // Sum
+  // Aggregate := agAverage;  // Average
+  // Aggregate := agCount;    // Count
+  // Aggregate := agMin;      // Minimum
+  // Aggregate := agMax;      // Maximum
+  // Aggregate := agFirst;    // First value
+  // Aggregate := agLast;     // Last value
+  // Aggregate := agStdDev;   // Standard deviation
+end;
+```
+
+## Complete Example: Sales Pivot
+
+```pascal
+uses
+  BI.DataItem, BI.Summary, BI.Persist,
+  VCLBI.Grid, VCLBI.Chart,
+  VCLBI.Editor.Summary,
+  System.Diagnostics;
+
+type
+  TPivotForm = class(TForm)
+    BIGrid1: TBIGrid;
+    BIChart1: TBIChart;
+    Panel1: TPanel;
+    Splitter1: TSplitter;
+    BtnRefresh: TButton;
+    CBHideDuplicates: TCheckBox;
+    CBColorize: TCheckBox;
+    LabelTime: TLabel;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure BtnRefreshClick(Sender: TObject);
+    procedure CBHideDuplicatesClick(Sender: TObject);
+    procedure CBColorizeClick(Sender: TObject);
+  private
+    Data, Result: TDataItem;
+    Summary: TSummary;
+    SummaryEditor: TSummaryEditor;
+    procedure CalculatePivot;
+    procedure ApplyFormatting;
+  end;
+
+procedure TPivotForm.FormCreate(Sender: TObject);
+begin
+  // Load data
+  Data := TStore.Load('SQLite_Demo');
+
+  // Create summary
+  Summary := TSummary.Create(Self);
+  Summary.Data := Data['Orders'];
+
+  // Dimensions
+  Summary.By.Add(Data['Customers']['Country']);
+  Summary.By.Add(Data['Orders']['OrderDate']).Part := dpYear;
+  Summary.By.Add(Data['Products']['Category']);
+
+  // Measures
+  with Summary.Measures.Add(Data['"Order Details"']['Quantity']) do
+  begin
+    Aggregate := agSum;
+    DestData.Name := 'Total Quantity';
+  end;
+
+  with Summary.Measures.Add(Data['"Order Details"']['UnitPrice']) do
+  begin
+    Aggregate := agAverage;
+    DestData.Name := 'Avg Price';
+  end;
+
+  // Calculate
+  CalculatePivot;
+
+  // Create editor
+  SummaryEditor := TSummaryEditor.Create(Self);
+  SummaryEditor.Parent := Panel1;
+  SummaryEditor.Align := alClient;
+  SummaryEditor.OnRecalculate := BtnRefreshClick;
+  SummaryEditor.Refresh(Summary);
+end;
+
+procedure TPivotForm.CalculatePivot;
+var
+  Stopwatch: TStopwatch;
+begin
+  Screen.Cursor := crHourGlass;
+  try
+    Result.Free;
+
+    Stopwatch := TStopwatch.StartNew;
+    Result := TDataItem.Create(Summary);
+
+    LabelTime.Caption := Format('Calculated in %d ms', 
+      [Stopwatch.ElapsedMilliseconds]);
+
+    BIGrid1.Data := Result;
+    BIChart1.Data := Result;
+
+    ApplyFormatting;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+end;
+
+procedure TPivotForm.ApplyFormatting;
+begin
+  // Hide duplicates
+  if CBHideDuplicates.Checked then
+    for var Dim in Summary.By do
+      if Dim.DestData <> nil then
+        BIGrid1.Duplicates(Dim.DestData, True);
+
+  // Colorize
+  if CBColorize.Checked then
+  begin
+    var Colorizers: TDataColorizers;
+    SetLength(Colorizers, Summary.Measures.Count);
+
+    for var I := 0 to Summary.Measures.Count - 1 do
+    begin
+      Colorizers[I].Data := Summary.Measures[I].DestData;
+      Colorizers[I].Colors.Inverted := False;
+      Colorizers[I].TextColor := TColorizeTextColor.Automatic;
+      Colorizers[I].Mode := TColorizeMode.Full;
+    end;
+
+    BIGrid1.Colorize(Colorizers);
+  end;
+end;
+
+procedure TPivotForm.BtnRefreshClick(Sender: TObject);
+begin
+  CalculatePivot;
+end;
+
+procedure TPivotForm.CBHideDuplicatesClick(Sender: TObject);
+begin
+  ApplyFormatting;
+end;
+
+procedure TPivotForm.CBColorizeClick(Sender: TObject);
+begin
+  ApplyFormatting;
+end;
+
+procedure TPivotForm.FormDestroy(Sender: TObject);
+begin
+  Result.Free;
+  Data.Free;
+  Summary.Free;
+end;
+```
+
+## Export Pivot Tables
+
+```pascal
+uses BI.CSV, BI.Excel;
+
+// Export to CSV
+TBICSVExport.SaveToFile(PivotResult, 'pivot.csv');
+
+// Export to Excel
+TBIExcelExport.SaveToFile(PivotResult, 'pivot.xlsx');
+```
+
+## Performance Tips
+
+<AccordionGroup>
+  <Accordion title="Index Dimensions">
+    Create indexes on dimension columns:
+    ```pascal
+    Data['Category'].CreateIndex;
+    Data['Year'].CreateIndex;
+    ```
+  </Accordion>
+  
+  <Accordion title="Filter Before Grouping">
+    Apply filters to reduce data before pivoting:
+    ```pascal
+    Summary.Filter := FilterExpression;
+    ```
+  </Accordion>
+  
+  <Accordion title="Parallel Processing">
+    Enable for large datasets (requires XE7+):
+    ```pascal
+    Summary.Parallel := True;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+- [Group By](/examples/group-by) - Single-dimension aggregation
+- [Grids](/examples/grids) - Display pivot results
+- [Charts](/examples/charts) - Visualize pivot data
+- [SQL Queries](/examples/sql-queries) - Query-based pivots

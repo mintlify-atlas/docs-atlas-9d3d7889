@@ -1,0 +1,302 @@
+---
+title: 'Sorting Results'
+description: 'ORDER BY and sorting in TeeBI queries'
+---
+
+TeeBI provides flexible sorting capabilities through ORDER BY clauses and the TSortItems class.
+
+## ORDER BY Syntax
+
+### Basic Sorting
+
+```pascal
+// Ascending (default)
+Result := TBISQL.From(Data, 'ProductName, Price order by Price');
+
+// Descending
+Result := TBISQL.From(Data, 'ProductName, Price order by Price desc');
+
+// Ascending explicit
+Result := TBISQL.From(Data, 'ProductName, Price order by Price asc');
+```
+
+### Multiple Columns
+
+```pascal
+Result := TBISQL.From(Data, 
+  'ProductName, Category, Price order by Category asc, Price desc');
+```
+
+### SORT BY Alias
+
+TeeBI accepts `sort by` as an alias for `order by`:
+
+```pascal
+Result := TBISQL.From(Data, 'ProductName, Price sort by Price');
+```
+
+See [IsClause](/queries/sql-syntax#keywords) at BI.SQL.pas:642.
+
+## Sort Directions
+
+- `asc` or `ascending` - Sort in ascending order (A-Z, 0-9)
+- `desc` or `descending` - Sort in descending order (Z-A, 9-0)
+
+If no direction is specified, ascending is assumed.
+
+## TSortItems Class
+
+Programmatic sorting using the TSortItems structure.
+
+### Structure
+
+```pascal
+type
+  TSortItem = record
+    Active: Boolean;
+    Data: TDataItem;
+    Descending: Boolean;
+    IgnoreTextCase: Boolean;
+  end;
+
+  TSortItems = record
+    Items: array of TSortItem;
+  end;
+```
+
+### Using TSortItems
+
+```pascal
+var
+  Select: TDataSelect;
+  SortItem: TSortItem;
+begin
+  Select := TDataSelect.Create(nil);
+  try
+    Select.Data := MyData;
+    Select.Add(MyData['ProductName']);
+    Select.Add(MyData['Price']);
+    
+    // Add sort by Price descending
+    SetLength(Select.SortBy.Items, 1);
+    Select.SortBy.Items[0].Active := True;
+    Select.SortBy.Items[0].Data := MyData['Price'];
+    Select.SortBy.Items[0].Descending := True;
+    Select.SortBy.Items[0].IgnoreTextCase := False;
+    
+    Result := Select.Calculate;
+  finally
+    Select.Free;
+  end;
+end;
+```
+
+## TBIQuery SortBy
+
+The TBIQuery component provides a SortBy collection. See [BI.Query.pas:318](/queries/sorting#tbiquery-sortby).
+
+```pascal
+var
+  Query: TBIQuery;
+  SortItem: TQuerySortItem;
+begin
+  Query := TBIQuery.Create(nil);
+  try
+    Query.Data := MyData;
+    Query.Dimensions.Add(MyData['ProductName']);
+    Query.Dimensions.Add(MyData['Price']);
+    
+    // Add sort item
+    SortItem := Query.SortBy.AddSort(
+      MyData['Price'],
+      False,  // Descending
+      True    // Ignore text case
+    );
+    
+    Result := Query.Calculate;
+  finally
+    Query.Free;
+  end;
+end;
+```
+
+### TQuerySortItem Properties
+
+- `Data` - The TDataItem to sort by
+- `Ascending` - True for ascending, False for descending (default: True)
+- `IgnoreTextCase` - Case-insensitive text sorting (default: True)
+- `Enabled` - Whether this sort item is active (default: True)
+
+See [TQuerySortItem](/queries/sorting#tquerysortitem) at BI.Query.pas:208.
+
+## ParseSort Method
+
+Parse ORDER BY strings into TSortItems. See [BI.SQL.pas:70](/queries/sorting#parsesort).
+
+```pascal
+class procedure TSQLParser.ParseSort(
+  const AData: TDataItem; 
+  var ASort: TSortItems; 
+  const AOrder: TTextArray;
+  const SQL: Boolean = False;
+  const Error: TBIErrorProc = nil
+);
+```
+
+### Example
+
+```pascal
+var
+  SortItems: TSortItems;
+  OrderBy: TTextArray;
+begin
+  SetLength(OrderBy, 2);
+  OrderBy[0] := 'Category';
+  OrderBy[1] := 'Price desc';
+  
+  TSQLParser.ParseSort(MyData, SortItems, OrderBy, True);
+  
+  // Use SortItems...
+end;
+```
+
+## Case Sensitivity
+
+Control case-sensitive sorting for text fields:
+
+```pascal
+var
+  SortItem: TSortItem;
+begin
+  SortItem.Data := MyData['ProductName'];
+  SortItem.IgnoreTextCase := True;  // Case-insensitive
+  SortItem.IgnoreTextCase := False; // Case-sensitive
+end;
+```
+
+When `IgnoreTextCase` is True:
+- "Apple" and "apple" are treated the same
+- Sorting: "Apple", "Banana", "cherry"
+
+When `IgnoreTextCase` is False:
+- "Apple" comes before "apple"
+- Sorting: "Apple", "Banana", "apple", "cherry"
+
+## Sorting with Expressions
+
+Sort by calculated expressions:
+
+```pascal
+// Sort by calculated field
+Result := TBISQL.From(Data, 
+  'ProductName, Price, Quantity order by (Price * Quantity) desc');
+```
+
+Expressions in ORDER BY are evaluated for each row.
+
+## Sorting Grouped Data
+
+Sort aggregated results:
+
+```pascal
+Result := TBISQL.From(Data, 
+  'Country, sum(Sales) group by Country order by sum(Sales) desc');
+```
+
+You can sort by:
+- Group dimensions (Country)
+- Aggregate measures (sum(Sales))
+
+## Multiple Sort Keys
+
+When sorting by multiple columns, earlier columns take precedence:
+
+```pascal
+Result := TBISQL.From(Data, 
+  'ProductName, Category, Price order by Category asc, Price desc');
+```
+
+This sorts:
+1. First by Category (ascending)
+2. Then by Price (descending) within each Category
+
+## Active/Inactive Sort Items
+
+Toggle sort items without removing them:
+
+```pascal
+var
+  Query: TBIQuery;
+begin
+  Query.SortBy[0].Enabled := False; // Temporarily disable
+  Query.SortBy[0].Enabled := True;  // Re-enable
+end;
+```
+
+## Exchange Sort Items
+
+Change sort priority by exchanging items:
+
+```pascal
+var
+  Query: TBIQuery;
+begin
+  // Swap sort priority of first two items
+  Query.SortBy.Exchange(Query.SortBy[0], Query.SortBy[1]);
+end;
+```
+
+See [TQuerySort.Exchange](/queries/sorting#exchange) at BI.Query.pas:1039.
+
+## Performance Considerations
+
+### Sorting Large Datasets
+
+For large datasets, sorting can be expensive. Consider:
+
+1. **Filter first** - Reduce data size before sorting
+2. **Limit results** - Use TOP/OFFSET to limit sorted rows
+3. **Index usage** - Pre-sorted data is faster
+
+```pascal
+// Good: Filter then sort
+Result := TBISQL.From(Data, 
+  'top 100 ProductName, Price where Category="Electronics" order by Price');
+
+// Less efficient: Sort all data then limit
+Result := TBISQL.From(Data, 
+  'top 100 ProductName, Price order by Price');
+```
+
+### Sort Algorithms
+
+TeeBI uses optimized sorting algorithms for different data types:
+- Integer data: Quicksort
+- Float data: Quicksort with NaN handling
+- Text data: Case-sensitive or case-insensitive comparison
+- DateTime data: Numeric comparison
+
+## Null Handling
+
+Missing (null) values in sorting:
+
+```pascal
+// Nulls appear first in ascending sort
+// Nulls appear last in descending sort
+```
+
+This matches standard SQL behavior.
+
+## Custom Sort Order
+
+For custom sort orders, use expressions:
+
+```pascal
+// Sort by custom priority
+Result := TBISQL.From(Data, 
+  'ProductName, Status order by case Status ' +
+  'when "Critical" then 1 ' +
+  'when "High" then 2 ' +
+  'when "Medium" then 3 ' +
+  'else 4 end');
+```

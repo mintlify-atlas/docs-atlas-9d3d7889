@@ -1,0 +1,371 @@
+---
+title: JSON Import
+description: Import JSON data with support for nested structures and arrays
+---
+
+The `TBIJson` class enables importing JSON data with automatic handling of nested objects, arrays, and type detection.
+
+## Quick Start
+
+```pascal
+uses BI.JSON, BI.DataItem;
+
+var
+  Data: TDataItem;
+  
+// Import JSON file
+Data := TBIJson.FromFile('data.json');
+
+// Import from text
+var
+  Json: TBIJson;
+Json := TBIJson.Create;
+try
+  Data := Json.ImportText('{"name":"John","age":30}');
+finally
+  Json.Free;
+end;
+```
+
+## Key Methods
+
+### ImportFile
+
+Import a JSON file:
+
+```pascal
+function ImportFile(const FileName: String): TDataArray;
+```
+
+**Example:**
+```pascal
+var
+  Json: TBIJson;
+  DataArray: TDataArray;
+  
+Json := TBIJson.Create;
+try
+  DataArray := Json.ImportFile('customers.json');
+  Data := TBISource.FromData(DataArray);
+finally
+  Json.Free;
+end;
+```
+
+### ImportText
+
+Import from JSON string:
+
+```pascal
+function ImportText(const Text: String): TDataItem;
+```
+
+**Example:**
+```pascal
+var
+  JsonText: String;
+  
+JsonText := '{' +
+  '"products": [' +
+    '{"name":"Widget","price":19.99},' +
+    '{"name":"Gadget","price":29.99}' +
+  ']' +
+'}';
+
+Data := Json.ImportText(JsonText);
+BIGrid1.Data := Data['products'];
+```
+
+### Import from TStrings
+
+```pascal
+function Import(const Strings: TStrings): TDataArray;
+```
+
+**Example:**
+```pascal
+var
+  Json: TBIJson;
+  
+Json := TBIJson.Create;
+try
+  // For MongoDB format (one object per line)
+  Json.Format := TBIJSONFormat.Array;
+  DataArray := Json.Import(Memo1.Lines);
+finally
+  Json.Free;
+end;
+```
+
+### FromFile with Format
+
+```pascal
+class function FromFile(const AFileName: String; 
+  const AFormat: TBIJSONFormat): TDataItem;
+```
+
+**Example:**
+```pascal
+// Normal JSON structure
+Data := TBIJson.FromFile('data.json', TBIJSONFormat.Normal);
+
+// Array format (MongoDB style)
+Data := TBIJson.FromFile('records.json', TBIJSONFormat.Array);
+```
+
+## JSON Formats
+
+### Normal Format
+
+Standard JSON objects and arrays:
+
+```json
+{
+  "customers": [
+    {
+      "id": 1,
+      "name": "John Smith",
+      "email": "john@example.com"
+    },
+    {
+      "id": 2,
+      "name": "Jane Doe",
+      "email": "jane@example.com"
+    }
+  ]
+}
+```
+
+```pascal
+Json.Format := TBIJSONFormat.Normal; // Default
+Data := Json.ImportFile('customers.json');
+```
+
+### Array Format (MongoDB)
+
+Multiple root objects, one per line:
+
+```json
+{"id":1,"name":"John","city":"NYC"}
+{"id":2,"name":"Jane","city":"LA"}
+{"id":3,"name":"Bob","city":"Chicago"}
+```
+
+```pascal
+Json.Format := TBIJSONFormat.Array;
+Data := Json.ImportFile('restaurants.json');
+```
+
+## Nested Structures
+
+TeeBI automatically handles nested JSON:
+
+```json
+{
+  "order": {
+    "id": 12345,
+    "customer": {
+      "name": "John Smith",
+      "email": "john@example.com"
+    },
+    "items": [
+      {"product": "Widget", "quantity": 2},
+      {"product": "Gadget", "quantity": 1}
+    ]
+  }
+}
+```
+
+```pascal
+Data := TBIJson.FromFile('order.json');
+
+// Access nested data
+CustomerName := Data['order']['customer']['name'].TextData[0];
+
+// Access array items
+Items := Data['order']['items'];
+BIGrid1.Data := Items;
+```
+
+## Hierarchical vs Flat Mode
+
+```pascal
+Json.Hierarchical := True;  // Default - preserve structure
+Json.Hierarchical := False; // Flatten with master-detail
+```
+
+**Hierarchical mode** preserves the JSON structure exactly.
+
+**Flat mode** creates master-detail relationships for better grid/query support.
+
+## Data Type Detection
+
+TBIJson automatically detects:
+- **Numbers**: Int32, Int64, Double
+- **Strings**: Text
+- **Booleans**: Boolean
+- **Null values**: Missing data markers
+- **Arrays**: Nested tables
+- **Objects**: Sub-structures
+
+## Advanced Examples
+
+### Import with Progress
+
+```pascal
+var
+  Json: TBIJson;
+  
+Json := TBIJson.Create;
+try
+  Json.OnProgress := procedure(Sender: TObject; 
+                               Percent: Integer; 
+                               var Cancel: Boolean)
+    begin
+      ProgressBar1.Position := Percent;
+      Application.ProcessMessages;
+    end;
+    
+  Data := Json.ImportFile('large_data.json');
+finally
+  Json.Free;
+end;
+```
+
+### Import from Folder
+
+```pascal
+Json.IncludePattern := '*.json';
+Json.ExcludePattern := 'temp_*.json';
+Data := Json.Import('C:\\JSONData', True); // Recursive
+```
+
+### Custom Engine
+
+Use a different JSON parser:
+
+```pascal
+uses BI.JSON.Standard; // or BI.JSON.FPC
+
+TBIJson.EngineClass := TStandardJSON;
+
+var
+  Json: TBIJson;
+Json := TBIJson.Create;
+try
+  Data := Json.ImportFile('data.json');
+finally
+  Json.Free;
+end;
+```
+
+## Export to JSON
+
+Use `TBIJSONExport` to save data as JSON:
+
+```pascal
+uses BI.JSON;
+
+var
+  Export: TBIJSONExport;
+  
+Export := TBIJSONExport.Create;
+try
+  Export.Data := MyData;
+  Export.Header := True; // Include metadata
+  
+  Export.SaveToFile('output.json');
+finally
+  Export.Free;
+end;
+```
+
+**Or as a one-liner:**
+
+```pascal
+var
+  JsonString: String;
+  
+JsonString := TBIJSONExport.AsString(MyData, False);
+```
+
+## File Format Detection
+
+```pascal
+// Check if file is JSON
+if TBIJson.Supports('.json') then
+  Data := TBIJson.FromFile(FileName);
+
+// Get file filter for dialogs
+OpenDialog1.Filter := TBIJson.FileFilter.ToString;
+// Returns: 'JSON files|*.json'
+```
+
+## Common Patterns
+
+### REST API Response
+
+```pascal
+uses System.Net.HttpClient;
+
+var
+  Http: THTTPClient;
+  Response: IHTTPResponse;
+  Json: TBIJson;
+  
+Http := THTTPClient.Create;
+Json := TBIJson.Create;
+try
+  Response := Http.Get('https://api.example.com/data');
+  Data := Json.ImportText(Response.ContentAsString);
+finally
+  Json.Free;
+  Http.Free;
+end;
+```
+
+### Array of Objects
+
+```json
+[
+  {"id": 1, "name": "Alice"},
+  {"id": 2, "name": "Bob"},
+  {"id": 3, "name": "Charlie"}
+]
+```
+
+```pascal
+Data := TBIJson.FromFile('users.json');
+BIGrid1.Data := Data;
+```
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Empty result from nested JSON">
+    Check the hierarchical mode:
+    ```pascal
+    Json.Hierarchical := True; // or False
+    ```
+  </Accordion>
+  
+  <Accordion title="MongoDB format not parsing">
+    Set the correct format:
+    ```pascal
+    Json.Format := TBIJSONFormat.Array;
+    ```
+  </Accordion>
+  
+  <Accordion title="Wrong data types detected">
+    JSON parser detects types automatically. To force a type, convert after import:
+    ```pascal
+    Data['amount'].Kind := TDataKind.dkDouble;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+- [Data Import Overview](/import/overview)
+- [CSV Import](/import/csv)
+- [XML Import](/import/xml)

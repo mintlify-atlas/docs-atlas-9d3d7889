@@ -1,0 +1,425 @@
+---
+title: TMissingData
+description: Record type for managing null/missing values in TDataItem
+---
+
+## Overview
+
+`TMissingData` is a record structure that maintains the list of null (empty/missing) values for a TDataItem as a boolean array. It provides efficient tracking and management of missing data points, which is crucial for accurate statistical calculations and data integrity.
+
+## Properties
+
+<ResponseField name="Count" type="TInteger">
+  The total number of potentially missing values being tracked.
+  
+  This represents the size of the Items array, which typically matches the TDataItem's Count.
+  
+  ```pascal
+  ShowMessage('Tracking ' + IntToStr(Data.Missing.Count) + ' values');
+  ```
+</ResponseField>
+
+<ResponseField name="Items" type="TBooleanArray">
+  The boolean array storing missing status for each value.
+  
+  Each element corresponds to a data value:
+  - `True` = value is missing/null
+  - `False` = value is present/valid
+  
+  ```pascal
+  // Direct access to the boolean array
+  for I := 0 to Data.Missing.Items.Count - 1 do
+    if Data.Missing.Items[I] then
+      ShowMessage('Row ' + IntToStr(I) + ' is missing');
+  ```
+</ResponseField>
+
+<ResponseField name="Item[Index]" type="Boolean" default>
+  Default indexed property for accessing missing status by index.
+  
+  <ParamField path="Index" type="TInteger" required>
+    The row index to check or set
+  </ParamField>
+  
+  ```pascal
+  // Check if value is missing
+  if Data.Missing[5] then
+    ShowMessage('Row 5 is missing');
+  
+  // Mark value as missing
+  Data.Missing[10] := True;
+  
+  // Mark value as present
+  Data.Missing[10] := False;
+  ```
+</ResponseField>
+
+## Methods
+
+<ResponseField name="Init" type="procedure">
+  Initializes the missing data array with a specified count.
+  
+  <ParamField path="ACount" type="TInteger" required>
+    Number of elements to allocate and initialize (all set to True/missing)
+  </ParamField>
+  
+  All values are initially set to True (missing).
+  
+  ```pascal
+  var
+    Data: TDataItem;
+  begin
+    Data := TDataItem.Create(dkInt32);
+    Data.Missing.Init(100); // Initialize with 100 missing values
+    Data.Free;
+  end;
+  ```
+</ResponseField>
+
+<ResponseField name="All" type="function">
+  Returns True if all values are marked as missing.
+  
+  Useful for validation and checking if a data item has any valid values.
+  
+  ```pascal
+  if Data.Missing.All then
+    ShowMessage('All values are missing')
+  else
+    ShowMessage('Some values are present');
+  ```
+</ResponseField>
+
+<ResponseField name="MissingCount" type="function">
+  Returns the number of values that are marked as missing.
+  
+  Counts how many True values exist in the Items array.
+  
+  ```pascal
+  var
+    Missing, Valid: Integer;
+  begin
+    Missing := Data.Missing.MissingCount;
+    Valid := Data.Count - Missing;
+    
+    ShowMessage(
+      Format('Missing: %d, Valid: %d, Total: %d', 
+      [Missing, Valid, Data.Count])
+    );
+  end;
+  ```
+</ResponseField>
+
+<ResponseField name="Swap" type="procedure">
+  Swaps the missing status of two positions.
+  
+  <ParamField path="A" type="TInteger" required>
+    First index position
+  </ParamField>
+  
+  <ParamField path="B" type="TInteger" required>
+    Second index position
+  </ParamField>
+  
+  Used internally during data sorting operations.
+  
+  ```pascal
+  Data.Missing.Swap(0, 5); // Swap missing status of positions 0 and 5
+  ```
+</ResponseField>
+
+## Usage Examples
+
+### Basic Missing Data Tracking
+
+```pascal
+var
+  Data: TDataItem;
+  I: Integer;
+begin
+  Data := TDataItem.Create(dkDouble, 'Temperature');
+  Data.Resize(10);
+  
+  // Set some values, mark others as missing
+  Data.DoubleData[0] := 22.5;
+  Data.DoubleData[1] := 23.1;
+  Data.Missing[2] := True;  // Missing value
+  Data.DoubleData[3] := 21.8;
+  Data.Missing[4] := True;  // Missing value
+  Data.DoubleData[5] := 24.2;
+  
+  // Count missing values
+  ShowMessage(
+    Format('Missing: %d of %d values', 
+    [Data.Missing.MissingCount, Data.Count])
+  );
+  
+  // List positions with missing data
+  for I := 0 to Data.Count - 1 do
+    if Data.Missing[I] then
+      ShowMessage('Missing at position: ' + IntToStr(I));
+  
+  Data.Free;
+end;
+```
+
+### Processing Data with Missing Values
+
+```pascal
+function CalculateAverage(Data: TDataItem): Double;
+var
+  I, ValidCount: Integer;
+  Sum: Double;
+begin
+  Result := 0;
+  Sum := 0;
+  ValidCount := 0;
+  
+  // Sum only non-missing values
+  for I := 0 to Data.Count - 1 do
+  begin
+    if not Data.Missing[I] then
+    begin
+      case Data.Kind of
+        dkInt32: Sum := Sum + Data.Int32Data[I];
+        dkInt64: Sum := Sum + Data.Int64Data[I];
+        dkSingle: Sum := Sum + Data.SingleData[I];
+        dkDouble: Sum := Sum + Data.DoubleData[I];
+      end;
+      Inc(ValidCount);
+    end;
+  end;
+  
+  if ValidCount > 0 then
+    Result := Sum / ValidCount;
+end;
+
+var
+  Data: TDataItem;
+begin
+  Data := TDataItem.Create(dkDouble, 'Sales');
+  Data.Resize(5);
+  
+  Data.DoubleData[0] := 100.0;
+  Data.DoubleData[1] := 150.0;
+  Data.Missing[2] := True;  // Missing
+  Data.DoubleData[3] := 200.0;
+  Data.Missing[4] := True;  // Missing
+  
+  ShowMessage('Average (excluding missing): ' + 
+    FloatToStr(CalculateAverage(Data)));
+  // Shows: 150.0 (average of 100, 150, 200)
+  
+  Data.Free;
+end;
+```
+
+### Importing Data with Nulls
+
+```pascal
+procedure ImportFromArray(Data: TDataItem; Values: array of Variant);
+var
+  I: Integer;
+begin
+  Data.Resize(Length(Values));
+  
+  for I := Low(Values) to High(Values) do
+  begin
+    if VarIsNull(Values[I]) or VarIsEmpty(Values[I]) then
+    begin
+      // Mark as missing
+      Data.Missing[I] := True;
+    end
+    else
+    begin
+      // Store the value
+      case Data.Kind of
+        dkInt32: Data.Int32Data[I] := Values[I];
+        dkDouble: Data.DoubleData[I] := Values[I];
+        dkText: Data.TextData[I] := VarToStr(Values[I]);
+      end;
+      Data.Missing[I] := False;
+    end;
+  end;
+end;
+
+var
+  Data: TDataItem;
+begin
+  Data := TDataItem.Create(dkInt32, 'Scores');
+  
+  // Import with some null values
+  ImportFromArray(Data, [100, Null, 95, 88, Null, 92]);
+  
+  ShowMessage(
+    Format('Imported %d values, %d missing', 
+    [Data.Count, Data.Missing.MissingCount])
+  );
+  // Shows: "Imported 6 values, 2 missing"
+  
+  Data.Free;
+end;
+```
+
+### Data Validation
+
+```pascal
+function ValidateData(Data: TDataItem): Boolean;
+var
+  I: Integer;
+  MissingCount: Integer;
+  MissingPercent: Double;
+begin
+  Result := True;
+  MissingCount := Data.Missing.MissingCount;
+  
+  // Check if all values are missing
+  if Data.Missing.All then
+  begin
+    ShowMessage('Error: All values are missing!');
+    Exit(False);
+  end;
+  
+  // Check if no data at all
+  if Data.Count = 0 then
+  begin
+    ShowMessage('Error: No data!');
+    Exit(False);
+  end;
+  
+  // Warn if too many missing values
+  MissingPercent := (MissingCount / Data.Count) * 100;
+  if MissingPercent > 50 then
+  begin
+    ShowMessage(
+      Format('Warning: %.1f%% of values are missing', [MissingPercent])
+    );
+  end;
+end;
+```
+
+### Filling Missing Values
+
+```pascal
+procedure FillMissingWithMean(Data: TDataItem);
+var
+  I, ValidCount: Integer;
+  Sum, Mean: Double;
+begin
+  if not Data.Kind.IsNumeric then
+    Exit;
+  
+  // Calculate mean of valid values
+  Sum := 0;
+  ValidCount := 0;
+  
+  for I := 0 to Data.Count - 1 do
+  begin
+    if not Data.Missing[I] then
+    begin
+      case Data.Kind of
+        dkInt32: Sum := Sum + Data.Int32Data[I];
+        dkDouble: Sum := Sum + Data.DoubleData[I];
+      end;
+      Inc(ValidCount);
+    end;
+  end;
+  
+  if ValidCount = 0 then
+    Exit;
+  
+  Mean := Sum / ValidCount;
+  
+  // Fill missing values with mean
+  for I := 0 to Data.Count - 1 do
+  begin
+    if Data.Missing[I] then
+    begin
+      case Data.Kind of
+        dkInt32: Data.Int32Data[I] := Round(Mean);
+        dkDouble: Data.DoubleData[I] := Mean;
+      end;
+      Data.Missing[I] := False;
+    end;
+  end;
+end;
+
+var
+  Data: TDataItem;
+begin
+  Data := TDataItem.Create(dkDouble, 'Values');
+  Data.Resize(5);
+  
+  Data.DoubleData[0] := 10.0;
+  Data.Missing[1] := True;
+  Data.DoubleData[2] := 20.0;
+  Data.Missing[3] := True;
+  Data.DoubleData[4] := 30.0;
+  
+  ShowMessage('Before: ' + IntToStr(Data.Missing.MissingCount) + ' missing');
+  
+  FillMissingWithMean(Data);
+  
+  ShowMessage('After: ' + IntToStr(Data.Missing.MissingCount) + ' missing');
+  ShowMessage('Filled with mean: ' + FloatToStr(Data.DoubleData[1]));
+  // Shows: 20.0 (mean of 10, 20, 30)
+  
+  Data.Free;
+end;
+```
+
+### Export with Missing Indicator
+
+```pascal
+procedure ExportToCSV(Data: TDataItem; FileName: String);
+var
+  F: TextFile;
+  I: Integer;
+  Value: String;
+begin
+  AssignFile(F, FileName);
+  Rewrite(F);
+  
+  try
+    // Write header
+    WriteLn(F, Data.Name);
+    
+    // Write data rows
+    for I := 0 to Data.Count - 1 do
+    begin
+      if Data.Missing[I] then
+        WriteLn(F, 'NULL')
+      else
+        WriteLn(F, Data.DataToString(I));
+    end;
+  finally
+    CloseFile(F);
+  end;
+end;
+```
+
+## Performance Notes
+
+<Note>
+  **Memory Usage**: The Missing boolean array uses 1 byte per value. For large datasets with few missing values, this overhead may be noticeable.
+</Note>
+
+<Note>
+  **Lazy Initialization**: The Missing.Items array is only allocated when needed (first time a value is marked as missing), saving memory for datasets with no missing values.
+</Note>
+
+<Note>
+  **Statistics**: TeeBI's statistical functions automatically account for missing values, excluding them from calculations like mean, variance, etc.
+</Note>
+
+## Best Practices
+
+1. **Always check for missing values** before performing calculations
+2. **Use Missing.MissingCount** to validate data quality before analysis
+3. **Document your missing data strategy** (exclude, fill, flag, etc.)
+4. **Consider the impact** of missing data on statistical results
+5. **Use Missing.All** to detect completely empty columns early
+
+## See Also
+
+- [TDataItem](/api/tdataitem) - Parent class containing TMissingData
+- [TArrays](/api/tarrays) - Array types including TBooleanArray

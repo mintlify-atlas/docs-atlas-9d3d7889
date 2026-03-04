@@ -1,0 +1,373 @@
+---
+title: Grid Visualization
+description: Display data in tabular format using TBIGrid
+---
+
+The `TBIGrid` component displays data in a grid/table format with sorting, filtering, and editing capabilities.
+
+## Basic Usage
+
+### VCL
+
+```pascal
+uses
+  VCLBI.Grid;
+
+var
+  Grid: TBIGrid;
+begin
+  Grid := TBIGrid.Create(Owner);
+  Grid.Parent := Self;
+  Grid.Align := alClient;
+  
+  // Assign data
+  Grid.Data := CustomerData;
+end;
+```
+
+See `VCLBI.Grid.pas:69` for the VCL `TBIGrid` class.
+
+### FireMonkey
+
+```pascal
+uses
+  FMXBI.Grid;
+
+var
+  Grid: TBIGrid;
+begin
+  Grid := TBIGrid.Create(Owner);
+  Grid.Parent := Self;
+  Grid.Align := TAlignLayout.Client;
+  
+  Grid.Data := CustomerData;
+end;
+```
+
+See `FMXBI.Grid.pas:27` for the FMX `TBIGrid` class.
+
+## Grid Engine
+
+TBIGrid uses a pluggable architecture. Set the engine before creating grids:
+
+### Using DBGrid (Default for VCL)
+
+```pascal
+uses
+  VCLBI.Grid, VCLBI.Grid.DBGrid;
+
+begin
+  TBIGrid.Engine := TBIDBGridPlugin;
+end;
+```
+
+### Using TeeGrid (Optional)
+
+```pascal
+uses
+  VCLBI.Grid, VCLBI.Grid.TeeGrid;
+
+begin
+  TBIGrid.Engine := TBITeeGridPlugin;
+end;
+```
+
+See `VCLBI.Grid.pas:121` for the `Engine` class variable.
+
+## Grid Features
+
+### Row Numbers
+
+Display row numbers in the first column:
+
+```pascal
+Grid.RowNumbers.Enabled := True;
+```
+
+See `VCLBI.Grid.pas:51-54` for `TRowNumbers`.
+
+### Filters
+
+Enable column filtering:
+
+```pascal
+Grid.Filters.Enabled := True;
+```
+
+See `VCLBI.Grid.pas:56-59` for `TGridFilters`.
+
+### Search
+
+Enable search functionality:
+
+```pascal
+Grid.Search.Enabled := True;
+```
+
+See `VCLBI.Grid.pas:63-66` for `TGridSearch`.
+
+### Read-Only Mode
+
+```pascal
+Grid.ReadOnly := True;  // Default is True
+```
+
+See `VCLBI.Grid.pas:139` for the `ReadOnly` property.
+
+### Totals Row
+
+```pascal
+Grid.Totals := True;  // Show totals at bottom
+```
+
+See `VCLBI.Grid.pas:143` for the `Totals` property.
+
+### Alternate Row Colors
+
+```pascal
+Grid.Alternate.Enabled := True;
+Grid.Alternate.Color := clMoneyGreen;
+```
+
+See `VCLBI.Grid.pas:136` for the `Alternate` property.
+
+## Navigation
+
+### Current Row
+
+```pascal
+var
+  Row: Integer;
+begin
+  // Get current row
+  Row := Grid.CurrentRow;
+  
+  // Set current row
+  Grid.CurrentRow := 10;
+end;
+```
+
+See `VCLBI.Grid.pas:132` for the `CurrentRow` property.
+
+### Focus Specific Cell
+
+```pascal
+Grid.FocusCell(RowIndex, Data['ColumnName']);
+```
+
+See `VCLBI.Grid.pas:129` for the `FocusCell` method.
+
+## Binding
+
+Bind to data sources:
+
+```pascal
+// Direct binding
+Grid.BindTo(MyData);
+
+// Or use Data property
+Grid.Data := MyData;
+```
+
+See `VCLBI.Grid.pas:126` for the `BindTo` method.
+
+## Filtering
+
+Apply filters programmatically:
+
+```pascal
+var
+  Filter: TExpression;
+begin
+  // Create filter expression
+  Filter := Data['Amount'] > 1000;
+  
+  // Apply to grid
+  Grid.Filter := Filter;
+end;
+```
+
+See `VCLBI.Grid.pas:133` for the `Filter` property.
+
+## Colorization
+
+Highlight cells based on values:
+
+```pascal
+var
+  Colorizers: TDataColorizers;
+begin
+  // Add colorization rules
+  Colorizers.Add(Data['Status']);     // Color by status
+  Colorizers.Add(Data['Amount']);     // Gradient by amount
+  
+  Grid.Colorize(Colorizers);
+end;
+```
+
+See `VCLBI.Grid.pas:127` for the `Colorize` method.
+
+## Duplicate Handling
+
+Hide or highlight duplicate values:
+
+```pascal
+// Hide duplicate values in column
+Grid.Duplicates(Data['Category'], True);
+
+// Show all values
+Grid.Duplicates(Data['Category'], False);
+```
+
+See `VCLBI.Grid.pas:128` for the `Duplicates` method.
+
+## Sub-Items Display
+
+Automatically show related data:
+
+```pascal
+Grid.ShowItems := TGridShowItems.Yes;
+// Automatic (default), Yes, No
+```
+
+See `VCLBI.Grid.pas:142` for the `ShowItems` property.
+
+When enabled, clicking a row shows related detail items in a side panel.
+
+## Events
+
+### Data Change
+
+```pascal
+Grid.OnDataChange := procedure(Sender: TObject)
+begin
+  // Row changed
+  ShowMessage('Current row: ' + IntToStr(Grid.CurrentRow));
+end;
+```
+
+See `VCLBI.Grid.pas:145` for `OnDataChange`.
+
+### Update Data
+
+```pascal
+Grid.OnUpdateData := procedure(Sender: TObject)
+begin
+  // Data was modified
+  SaveChanges(Grid.Data);
+end;
+```
+
+See `VCLBI.Grid.pas:146` for `OnUpdateData`.
+
+## DataSource Access
+
+Access underlying dataset:
+
+```pascal
+var
+  DataSource: TDataSource;
+begin
+  DataSource := Grid.DataSource;
+  
+  // Work with TDataSet
+  if DataSource.DataSet.Active then
+    ShowMessage('Row count: ' + IntToStr(DataSource.DataSet.RecordCount));
+end;
+```
+
+See `VCLBI.Grid.pas:137` for the `DataSource` property.
+
+## Plugin System
+
+The grid uses a plugin architecture for flexibility:
+
+```pascal
+var
+  Plugin: TBIGridPlugin;
+begin
+  Plugin := Grid.Plugin;
+  
+  // Plugin provides low-level grid control
+  Plugin.BindTo(DataSet);
+  Plugin.ReadOnly := True;
+  Plugin.Totals := True;
+end;
+```
+
+See `VCLBI.Grid.pas:134` for the `Plugin` property.
+
+## Complete Example
+
+```pascal
+uses
+  VCLBI.Grid, BI.DataItem, BI.Expression;
+
+procedure CreateCustomerGrid;
+var
+  Grid: TBIGrid;
+  Data: TDataItem;
+  Filter: TExpression;
+  Colorizers: TDataColorizers;
+begin
+  // Create grid
+  Grid := TBIGrid.Create(Self);
+  Grid.Parent := Self;
+  Grid.Align := alClient;
+  
+  // Configure features
+  Grid.RowNumbers.Enabled := True;
+  Grid.Filters.Enabled := True;
+  Grid.Search.Enabled := True;
+  Grid.ReadOnly := False;  // Allow editing
+  Grid.Totals := True;
+  
+  // Alternate row colors
+  Grid.Alternate.Enabled := True;
+  Grid.Alternate.Color := $F0F0F0;
+  
+  // Load data
+  Data := LoadCustomerData;
+  Grid.Data := Data;
+  
+  // Apply filter
+  Filter := Data['Country'] = 'USA';
+  Grid.Filter := Filter;
+  
+  // Colorize by status
+  Colorizers.Add(Data['Status']);
+  Grid.Colorize(Colorizers);
+  
+  // Hide duplicate categories
+  Grid.Duplicates(Data['Category'], True);
+  
+  // Handle events
+  Grid.OnDataChange := RowChanged;
+  Grid.OnUpdateData := DataModified;
+end;
+```
+
+## VCL vs FireMonkey Differences
+
+Most API is identical, but there are some differences:
+
+| Feature | VCL | FireMonkey |
+|---------|-----|------------|
+| **Filters** | ✓ Supported | ✗ Not available |
+| **Search** | ✓ Supported | ✗ Not available |
+| **Row Numbers** | ✓ Supported | ✗ Not available |
+| **Totals** | ✓ Supported | ✗ Not available |
+| **Copy to Clipboard** | ✓ Built-in | ✓ Via TUICommon |
+
+See `VCLBI.Grid.pas:40-60` and `FMXBI.Grid.pas:27` for platform differences.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Charts" icon="chart-line" href="/visualization/charts">
+    Visualize data with charts
+  </Card>
+  <Card title="Trees" icon="diagram-project" href="/visualization/trees">
+    Display hierarchical data
+  </Card>
+</CardGroup>

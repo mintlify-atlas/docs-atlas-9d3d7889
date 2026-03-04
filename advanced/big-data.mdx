@@ -1,0 +1,196 @@
+---
+title: Big Data Support
+description: Work with billions of cells and massive datasets in TeeBI
+---
+
+## Overview
+
+TeeBI is **big-data ready**, designed to handle datasets containing billions of cells. The array-based architecture and 64-bit support enable processing of massive datasets that exceed traditional database limitations.
+
+## Architecture for Scale
+
+### 64-Bit Support
+
+TeeBI automatically adapts to platform architecture:
+
+```pascal
+TInteger = NativeInt;  // Int64 on x64, Int32 on x86
+
+{$IFDEF CPUX64}
+TNativeIntArray = TInt64Array;
+TNativeInteger = Int64;
+{$ELSE}
+TNativeIntArray = TInt32Array;
+TNativeInteger = Integer;
+{$ENDIF}
+```
+
+On 64-bit platforms, arrays can theoretically address up to 2^63 elements (though practical limits are lower due to available RAM).
+
+### Memory-Efficient Storage
+
+**Columnar Format**: Only load columns you need, not entire rows.
+
+**Type Optimization**: Each column uses the most appropriate data type.
+
+**Delayed Loading**: Use data providers to load data on-demand.
+
+## Billion-Cell Example
+
+See the [OneBillion demo](https://github.com/Steema/TeeBI/tree/master/demos/experiments/bigdata/OneBillion) for a working example of handling massive datasets.
+
+### Creating Large Datasets
+
+```pascal
+uses BI.DataItem;
+
+var Data: TDataItem;
+    RowCount: Int64;
+begin
+  Data := TDataItem.Create(True);
+  
+  // Add columns
+  Data.Items.Add('ID', dkInt64);
+  Data.Items.Add('Value', dkDouble);
+  Data.Items.Add('Category', dkInt32);
+  
+  // Allocate for 1 billion rows
+  RowCount := 1000000000;
+  Data.Resize(RowCount);
+  
+  // Populate data (consider parallel processing)
+  // See Parallel Processing documentation
+end;
+```
+
+## Memory Considerations
+
+### Calculate Memory Requirements
+
+Estimate memory needs before loading:
+
+```pascal
+// Example: 100 million rows
+Rows := 100000000;
+
+// Columns:
+// - Int64 (8 bytes)
+// - Double (8 bytes)  
+// - Int32 (4 bytes)
+// - String (varies, assume avg 20 bytes)
+
+EstimatedBytes := Rows * (8 + 8 + 4 + 20);
+// = 100M * 40 bytes = 4 GB
+```
+
+### Memory Management Tips
+
+1. **Free Unused Data**: Release TDataItem instances when done
+2. **Use Filters**: Create filtered views instead of copying data
+3. **Stream Processing**: Process data in chunks when possible
+4. **Compression**: Use compressed storage for disk persistence
+
+## Delayed Loading
+
+For datasets too large to fit in memory, use delayed loading providers:
+
+```pascal
+var Data: TDataItem;
+    Provider: TDataDelayProvider;
+begin
+  // Create data with metadata only
+  Data := TDataItem.Create(True);
+  
+  // Set up delayed loading provider
+  Provider := TMyCustomProvider.Create;
+  Data.Provider := Provider;
+  
+  // Data loads on-demand when accessed
+  // Only loaded portions stay in memory
+end;
+```
+
+## Remote Web Server for Big Data
+
+Use the TeeBI Web Server to serve large datasets remotely:
+
+- **Server-Side Processing**: Perform queries and aggregations on the server
+- **Compressed Transmission**: Only transfer needed data, compressed
+- **Pagination**: Load data in pages/chunks
+
+See [Web Server](/advanced/web-server) for details.
+
+## Query Optimization for Large Data
+
+### Use Indexes
+
+Create indexes on frequently queried columns:
+
+```pascal
+Data['CustomerID'].CreateIndex;
+```
+
+### Limit Results
+
+Use TOP and OFFSET in queries:
+
+```pascal
+uses BI.SQL;
+
+// Get first 1000 rows, skip first 5000
+var Result: TDataItem;
+Result := TBISQL.From(Data, 'top 1000 offset 5000 *');
+```
+
+### Group and Aggregate
+
+Reduce data volume through aggregation:
+
+```pascal
+// Summarize billions of transactions
+var Summary: TDataItem;
+Summary := TBISQL.From(Data, 
+  'sum(Amount), count(*) group by Year, Country');
+```
+
+## Parallel Processing
+
+Leverage multiple CPU cores for big data operations:
+
+```pascal
+uses BI.Arrays.Parallel;
+
+var Sorted: TInt64Array;
+Sorted := TParallelArray.Sort(Data['ID'].Int64Data, True, 0);
+// 0 = auto-detect CPU count
+```
+
+See [Parallel Processing](/advanced/parallel-processing) for more details.
+
+## Best Practices
+
+1. **Test with Representative Data**: Profile performance with realistic data volumes
+2. **Monitor Memory**: Use task manager or profiling tools to watch memory usage
+3. **Use 64-Bit**: Always compile as 64-bit for large datasets
+4. **Progressive Loading**: Load data in stages if possible
+5. **Compression**: Use compression for stored data to reduce disk I/O
+
+## Platform Limits
+
+### Theoretical Limits (64-bit)
+
+- **Array Elements**: Up to 2^63-1 (limited by available RAM)
+- **Memory**: Up to available physical + virtual memory
+
+### Practical Limits
+
+- **RAM**: Most systems have 8-128 GB RAM
+- **OS Limits**: Windows/Linux/macOS impose process memory limits
+- **Performance**: Beyond a few billion rows, consider distributed systems
+
+## Related Topics
+
+- [Performance Optimization](/advanced/performance)
+- [Parallel Processing](/advanced/parallel-processing)
+- [Compression](/advanced/compression)
+- [Web Server](/advanced/web-server)

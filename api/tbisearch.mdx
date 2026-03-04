@@ -1,0 +1,421 @@
+---
+title: TDataSearch
+description: Search and filter data
+---
+
+## Overview
+
+`TDataSearch` provides full-text search across TDataItem data, with support for background processing and hit tracking.
+
+Location: `BI.Search.pas:51`
+
+## Properties
+
+### Source
+```pascal
+Source: TDataItem;
+```
+Data to search.
+
+### Items
+```pascal
+Items: TDataItem;
+```
+Specific item to search. If nil, searches all items in Source.
+
+### Index
+```pascal
+Index: TCursorIndex;
+```
+Row indices to search. If nil, searches all rows.
+
+### CaseSensitive
+```pascal
+CaseSensitive: Boolean;  // Default: False
+```
+Case-sensitive search.
+
+### TextPart
+```pascal
+TextPart: TDataSearchPart;
+```
+- `Anywhere`: Match anywhere in text (default)
+- `AtStart`: Match at beginning
+- `AtEnd`: Match at end
+- `Exact`: Exact match only
+
+### FloatFormat
+```pascal
+FloatFormat: String;
+```
+Format string for float comparisons.
+
+### DateTimeFormat
+```pascal
+DateTimeFormat: String;
+```
+Format string for DateTime comparisons.
+
+### Hits
+```pascal
+Hits: TSearchHits;
+```
+Detailed hit tracking.
+
+```pascal
+Hits.Enabled: Boolean;      // Enable hit tracking
+Hits.Count: TInteger;       // Total number of hits
+```
+
+## Methods
+
+### Find
+
+```pascal
+function Find(const AText: String): TCursorIndex;
+```
+
+Searches and returns array of matching row indices.
+
+### BackgroundFind
+
+```pascal
+procedure BackgroundFind(const AText: String);
+```
+
+Searches in background thread, fires OnFinished when complete.
+
+### Stop
+
+```pascal
+procedure Stop;
+```
+
+Cancels background search.
+
+## Events
+
+### OnFinished
+
+```pascal
+property OnFinished: TSearchFinished;
+
+type
+  TSearchFinished = procedure(const AIndex: TCursorIndex) of object;
+```
+
+Fired when search completes (foreground or background).
+
+### OnProgress
+
+```pascal
+property OnProgress: TSearchProgress;
+
+type
+  TSearchProgress = procedure(var Stop: Boolean) of object;
+```
+
+Fired during search. Set Stop := True to cancel.
+
+## Usage Examples
+
+### Basic Search
+
+```pascal
+var
+  Search: TDataSearch;
+  Results: TCursorIndex;
+begin
+  Search.Source := MyData;
+  Search.CaseSensitive := False;
+  
+  Results := Search.Find('Alice');
+  
+  if Length(Results) > 0 then
+    ShowMessage('Found in ' + IntToStr(Length(Results)) + ' rows')
+  else
+    ShowMessage('Not found');
+end;
+```
+
+### Search Specific Column
+
+```pascal
+var
+  Search: TDataSearch;
+  Results: TCursorIndex;
+begin
+  Search.Source := MyData;
+  Search.Items := MyData.Items['Name'];  // Search only Name column
+  
+  Results := Search.Find('Smith');
+  
+  ShowMessage('Found ' + IntToStr(Length(Results)) + ' matches');
+end;
+```
+
+### Filter Grid Results
+
+```pascal
+var
+  Search: TDataSearch;
+  Results: TCursorIndex;
+  Cursor: TDataCursor;
+begin
+  Search.Source := MyData;
+  Results := Search.Find(Edit1.Text);
+  
+  if Length(Results) > 0 then
+  begin
+    Cursor := TDataCursor.Create(nil);
+    try
+      Cursor.Data := MyData;
+      Cursor.Index := Results;
+      BIGrid1.Fill(Cursor);
+    finally
+      Cursor.Free;
+    end;
+  end
+  else
+    ShowMessage('No matches');
+end;
+```
+
+### Background Search
+
+```pascal
+var
+  Search: TDataSearch;
+
+procedure TForm1.ButtonSearchClick(Sender: TObject);
+begin
+  Search.Source := MyLargeDataset;
+  Search.OnFinished := SearchFinished;
+  Search.OnProgress := SearchProgress;
+  
+  ProgressBar1.Visible := True;
+  Search.BackgroundFind(Edit1.Text);
+end;
+
+procedure TForm1.SearchFinished(const AIndex: TCursorIndex);
+begin
+  ProgressBar1.Visible := False;
+  
+  if Length(AIndex) > 0 then
+  begin
+    Label1.Caption := 'Found: ' + IntToStr(Length(AIndex));
+    // Display results
+  end
+  else
+    Label1.Caption := 'No matches';
+end;
+
+procedure TForm1.SearchProgress(var Stop: Boolean);
+begin
+  Application.ProcessMessages;
+  Stop := FCancelled;  // User clicked Cancel button
+end;
+```
+
+### Search with Different Modes
+
+```pascal
+var
+  Search: TDataSearch;
+  Results: TCursorIndex;
+begin
+  Search.Source := MyData;
+  
+  // Exact match
+  Search.TextPart := TDataSearchPart.Exact;
+  Results := Search.Find('John Smith');
+  
+  // Starts with
+  Search.TextPart := TDataSearchPart.AtStart;
+  Results := Search.Find('John');
+  
+  // Ends with
+  Search.TextPart := TDataSearchPart.AtEnd;
+  Results := Search.Find('.com');
+  
+  // Contains (default)
+  Search.TextPart := TDataSearchPart.Anywhere;
+  Results := Search.Find('Smith');
+end;
+```
+
+### Case-Sensitive Search
+
+```pascal
+var
+  Search: TDataSearch;
+begin
+  Search.Source := MyData;
+  Search.CaseSensitive := True;
+  
+  Results := Search.Find('ABC');  // Won't match 'abc'
+end;
+```
+
+### Search with Hit Tracking
+
+```pascal
+var
+  Search: TDataSearch;
+  Results: TCursorIndex;
+  Row: Integer;
+  Column: TDataItem;
+begin
+  Search.Source := MyData;
+  Search.Hits.Enabled := True;
+  
+  Results := Search.Find('test');
+  
+  // Total hits across all rows/columns
+  ShowMessage('Total hits: ' + IntToStr(Search.Hits.Count));
+  
+  // Check specific cell
+  Row := 5;
+  Column := MyData.Items['Name'];
+  if Search.Hits.Exists(Row, Column) then
+    ShowMessage('Hit found in row 5, Name column');
+end;
+```
+
+### Search Numeric Data
+
+```pascal
+var
+  Search: TDataSearch;
+begin
+  Search.Source := MyData;
+  Search.FloatFormat := '0.00';  // Format for comparison
+  
+  Results := Search.Find('123.45');
+end;
+```
+
+### Search Dates
+
+```pascal
+var
+  Search: TDataSearch;
+begin
+  Search.Source := MyData;
+  Search.DateTimeFormat := 'yyyy-mm-dd';
+  
+  Results := Search.Find('2024-03-15');
+end;
+```
+
+### Incremental Search
+
+```pascal
+procedure TForm1.Edit1Change(Sender: TObject);
+var
+  Search: TDataSearch;
+  Results: TCursorIndex;
+begin
+  if Length(Edit1.Text) >= 3 then  // Start after 3 chars
+  begin
+    Search.Source := MyData;
+    Results := Search.Find(Edit1.Text);
+    
+    Label1.Caption := IntToStr(Length(Results)) + ' matches';
+  end;
+end;
+```
+
+### Search Subset
+
+```pascal
+var
+  Search: TDataSearch;
+  Filter, Results: TCursorIndex;
+begin
+  // First filter
+  Filter := GetActiveRecords(MyData);
+  
+  // Then search within filtered results
+  Search.Source := MyData;
+  Search.Index := Filter;
+  Results := Search.Find('keyword');
+  
+  ShowMessage('Found in ' + IntToStr(Length(Results)) + ' active records');
+end;
+```
+
+### Cancel Long Search
+
+```pascal
+var
+  Search: TDataSearch;
+  FCancelled: Boolean;
+
+procedure TForm1.ButtonSearchClick(Sender: TObject);
+begin
+  FCancelled := False;
+  ButtonCancel.Enabled := True;
+  
+  Search.Source := MyHugeDataset;
+  Search.OnProgress := 
+    procedure(var Stop: Boolean)
+    begin
+      Application.ProcessMessages;
+      Stop := FCancelled;
+    end;
+  
+  Results := Search.Find(Edit1.Text);
+  ButtonCancel.Enabled := False;
+end;
+
+procedure TForm1.ButtonCancelClick(Sender: TObject);
+begin
+  FCancelled := True;
+end;
+```
+
+## TSearchHits
+
+Detailed hit tracking (when Hits.Enabled := True).
+
+### Methods
+
+```pascal
+function Count: TInteger;  // Total hits
+function Exists(const ARow: TInteger; const AData: TDataItem): Boolean;
+function IndexOf(const ARow: TInteger; const AData: TDataItem): TInteger;
+procedure Find(const AIndex: TInteger; out ARow: TInteger; out AData: TDataItem);
+```
+
+### Usage
+
+```pascal
+var
+  Search: TDataSearch;
+  HitRow: Integer;
+  HitColumn: TDataItem;
+  i: Integer;
+begin
+  Search.Hits.Enabled := True;
+  Search.Source := MyData;
+  Results := Search.Find('test');
+  
+  // Enumerate all hits
+  for i := 0 to Search.Hits.Count - 1 do
+  begin
+    Search.Hits.Find(i, HitRow, HitColumn);
+    Memo1.Lines.Add(
+      Format('Hit %d: Row %d, Column %s', [i, HitRow, HitColumn.Name])
+    );
+  end;
+end;
+```
+
+## Performance Tips
+
+- Use `Items` to search specific columns
+- Use `Index` to search subset of rows
+- Enable `Hits` only when needed (adds overhead)
+- Use `BackgroundFind` for large datasets
+- Implement `OnProgress` for user feedback

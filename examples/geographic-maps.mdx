@@ -1,0 +1,427 @@
+---
+title: Geographic Maps
+description: Create geographic visualizations and choropleth maps with TeeBI
+---
+
+TeeBI includes a built-in geographic database for creating world maps and regional visualizations.
+
+## Basic Geographic Map
+
+```pascal
+uses
+  BI.DataItem, BI.Persist, BI.Geographic, BI.Query,
+  VCLBI.Chart, VCLBI.Grid,
+  VCLTee.TeeWorldSeries;
+
+type
+  TMapForm = class(TForm)
+    BIChart1: TBIChart;
+    BIGrid1: TBIGrid;
+    BIQuery1: TBIQuery;
+    procedure FormCreate(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+  private
+    Education: TDataItem;
+    Result: TDataItem;
+    procedure SetupChart;
+  end;
+
+procedure TMapForm.FormCreate(Sender: TObject);
+begin
+  // Initialize geographic database
+  TGeo.Check;
+
+  // Load geographic data
+  Education := TStore.Load('BISamples', 
+    'US Education 1970-2014 by counties')['USA_Counties_Education'];
+
+  // Create query with FIPS codes for mapping
+  BIQuery1.Clear;
+  BIQuery1.Dimensions.Add(Education['FIPS Code']);
+  BIQuery1.Dimensions.Add(Education['Percent of adults with a bachelor''s degree or higher; 2010-14']);
+
+  Result := BIQuery1.Calculate;
+
+  // Display
+  BIGrid1.Data := Result;
+  BIChart1.Data := Result;
+
+  SetupChart;
+end;
+
+procedure TMapForm.SetupChart;
+begin
+  // Configure chart for map display
+  BIChart1.Options.Title := TBIChartTitle.Custom;
+  BIChart1.Chart.Title.Caption := 'Education Level by County';
+
+  BIChart1.Chart.ClipPoints := False;
+  BIChart1.Chart.Gradient.Visible := False;
+  BIChart1.Chart.BackWall.Hide;
+  BIChart1.Chart.ParentColor := True;
+  BIChart1.Chart.View3D := False;
+end;
+
+procedure TMapForm.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  BIGrid1.Data.Free;
+  Education.Free;
+end;
+```
+
+## Customize Map Appearance
+
+```pascal
+uses VCLTee.TeeWorldSeries;
+
+procedure CustomizeWorldMap;
+var
+  WorldSeries: TWorldSeries;
+begin
+  WorldSeries := BIChart1.Chart[0] as TWorldSeries;
+
+  // Color palette
+  WorldSeries.UsePalette := True;
+  WorldSeries.PaletteStyle := psRainbow;
+
+  // Or use color range
+  WorldSeries.UsePalette := False;
+  WorldSeries.UseColorRange := True;
+  WorldSeries.StartColor := clGreen;
+  WorldSeries.EndColor := clRed;
+
+  // Borders
+  WorldSeries.Pen.Color := clBlack;
+  WorldSeries.Pen.Width := 1;
+
+  // Marks (labels)
+  WorldSeries.Marks.Visible := True;
+  WorldSeries.Marks.Style := smsValue;
+end;
+```
+
+## Map Events
+
+```pascal
+uses VCLTee.TeeWorldSeries;
+
+procedure TMapForm.BIChart1AddSeries(Sender: TCustomChartSeries);
+var
+  WorldSeries: TWorldSeries;
+begin
+  // Called when chart creates the map series
+  WorldSeries := Sender as TWorldSeries;
+
+  WorldSeries.UsePalette := True;
+  WorldSeries.PaletteStyle := psRainbow;
+  WorldSeries.Marks.Visible := False;
+end;
+```
+
+## USA Counties Map
+
+```pascal
+uses BI.Geographic;
+
+procedure ShowUSACounties;
+var
+  CountyData: TDataItem;
+  Query: TBIQuery;
+begin
+  // Load US county education data
+  CountyData := TStore.Load('BISamples', 
+    'US Education 1970-2014 by counties')['USA_Counties_Education'];
+
+  // Query by FIPS code and education metric
+  Query := TBIQuery.Create(Self);
+  try
+    Query.Data := CountyData;
+    Query.Dimensions.Add(CountyData['FIPS Code']);
+    Query.Dimensions.Add(CountyData['Percent of adults with less than a high school diploma; 2010-14']);
+
+    BIChart1.Data := Query.Calculate;
+    BIChart1.Chart.Title.Caption := 'Education Level by US County';
+  finally
+    Query.Free;
+    CountyData.Free;
+  end;
+end;
+```
+
+## World Countries Map
+
+```pascal
+uses BI.Geographic;
+
+// Create world map from sales data
+procedure ShowWorldSales;
+var
+  Sales: TDataItem;
+begin
+  // Your sales data with Country column
+  Sales := TStore.Load('Sales');
+
+  // Group by country
+  BIChart1.Data := TBISQL.From(Sales, 
+    'sum(Revenue) group by Country');
+
+  BIChart1.Chart.Title.Caption := 'Sales by Country';
+end;
+```
+
+## Complete Example: Interactive Map
+
+```pascal
+uses
+  BI.DataItem, BI.Persist, BI.Geographic, BI.Query,
+  VCLBI.Chart, VCLBI.Grid,
+  VCLTee.TeeWorldSeries, VCLTee.TeCanvas, VCLTee.EditChar;
+
+type
+  TInteractiveMap = class(TForm)
+    BIChart1: TBIChart;
+    BIGrid1: TBIGrid;
+    BIQuery1: TBIQuery;
+    Panel1: TPanel;
+    ListBoxYear: TListBox;
+    ListBoxMetric: TListBox;
+    CheckBoxMarks: TCheckBox;
+    CheckBoxPalette: TCheckBox;
+    ButtonEditChart: TButton;
+    Splitter1: TSplitter;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure ListBoxYearClick(Sender: TObject);
+    procedure ListBoxMetricClick(Sender: TObject);
+    procedure CheckBoxMarksClick(Sender: TObject);
+    procedure CheckBoxPaletteClick(Sender: TObject);
+    procedure ButtonEditChartClick(Sender: TObject);
+    procedure BIChart1AddSeries(Sender: TCustomChartSeries);
+  private
+    Education: TDataItem;
+    procedure DoQuery;
+    procedure SetupGrid;
+    function WorldSeries: TWorldSeries;
+  end;
+
+procedure TInteractiveMap.FormCreate(Sender: TObject);
+begin
+  // Initialize geographic database
+  TGeo.Check;
+
+  // Load data
+  Education := TStore.Load('BISamples',
+    'US Education 1970-2014 by counties')['USA_Counties_Education'];
+
+  // Setup UI
+  ListBoxMetric.ItemIndex := 1;  // Default metric
+  ListBoxYear.ItemIndex := 0;    // Default year
+
+  // Initial query
+  DoQuery;
+end;
+
+function TInteractiveMap.WorldSeries: TWorldSeries;
+begin
+  Result := BIChart1.Chart[0] as TWorldSeries;
+end;
+
+procedure TInteractiveMap.DoQuery;
+var
+  FieldIndex: Integer;
+begin
+  BIGrid1.Data.Free;
+
+  BIQuery1.Clear;
+  BIQuery1.Dimensions.Add(Education['FIPS Code']);
+
+  // Calculate field index based on year and metric selection
+  case ListBoxYear.ItemIndex of
+    0: FieldIndex := 12;
+    1: FieldIndex := 20;
+    2: FieldIndex := 28;
+    3: FieldIndex := 36;
+  else
+    FieldIndex := 44;
+  end;
+
+  FieldIndex := FieldIndex + ListBoxMetric.ItemIndex - 1;
+
+  BIQuery1.Dimensions.Add(Education[FieldIndex]);
+
+  BIGrid1.Data := BIQuery1.Calculate;
+  BIChart1.Data := BIGrid1.Data;
+
+  BIChart1.Chart.Title.Caption := Education[FieldIndex].Name;
+
+  SetupGrid;
+end;
+
+procedure TInteractiveMap.SetupGrid;
+var
+  Grid: TBIDBGrid;
+begin
+  Grid := BIGrid1.Plugin.GetObject as TBIDBGrid;
+  if Grid.Fields.Count > 1 then
+    Grid.Fields[1].DisplayLabel := '%';
+end;
+
+procedure TInteractiveMap.ListBoxYearClick(Sender: TObject);
+begin
+  DoQuery;
+end;
+
+procedure TInteractiveMap.ListBoxMetricClick(Sender: TObject);
+begin
+  DoQuery;
+end;
+
+procedure TInteractiveMap.CheckBoxMarksClick(Sender: TObject);
+begin
+  WorldSeries.Marks.Visible := CheckBoxMarks.Checked;
+end;
+
+procedure TInteractiveMap.CheckBoxPaletteClick(Sender: TObject);
+var
+  S: TWorldSeries;
+begin
+  S := WorldSeries;
+  S.UsePalette := CheckBoxPalette.Checked;
+  S.UseColorRange := not S.UsePalette;
+  S.PaletteStyle := psRainbow;
+end;
+
+procedure TInteractiveMap.BIChart1AddSeries(Sender: TCustomChartSeries);
+begin
+  CheckBoxPaletteClick(Self);
+end;
+
+procedure TInteractiveMap.ButtonEditChartClick(Sender: TObject);
+begin
+  EditChart(Self, BIChart1.Chart);
+end;
+
+procedure TInteractiveMap.FormDestroy(Sender: TObject);
+begin
+  BIGrid1.Data.Free;
+  Education.Free;
+end;
+```
+
+## Geographic Database
+
+```pascal
+uses BI.Geographic;
+
+// Check if geographic database is initialized
+if not TGeo.Available then
+  TGeo.Check;  // Initialize database
+
+// Get country information
+var
+  Country: TGeoItem;
+begin
+  Country := TGeo.Countries.Find('United States');
+  if Country <> nil then
+  begin
+    ShowMessage('Capital: ' + Country.Capital);
+    ShowMessage('ISO Code: ' + Country.ISOCode);
+  end;
+end;
+```
+
+## Map Rendering Options
+
+```pascal
+uses VCLTee.TeeSkia, VCLTee.TeeGDIPlus;
+
+// Use Skia renderer for better quality
+procedure UseSkiaRenderer;
+begin
+  BIChart1.Chart.Canvas := TTeeSkiaCanvas.Create;
+end;
+
+// Use GDI+ renderer
+procedure UseGDIPlusRenderer;
+begin
+  BIChart1.Chart.Canvas := TGDIPlusCanvas.Create;
+end;
+```
+
+## Export Maps
+
+```pascal
+uses VCLTee.TeeJPEG, VCLTee.TeePNG, VCLTee.TeeSVGCanvas;
+
+// Export map to image
+BIChart1.Chart.SaveToJPEGFile('map.jpg');
+BIChart1.Chart.SaveToPNGFile('map.png');
+BIChart1.Chart.SaveToSVGFile('map.svg');
+```
+
+## Custom Map Data
+
+```pascal
+// Create map from custom geographic data
+procedure CreateCustomMap;
+var
+  Data: TDataItem;
+  Regions, Values: TDataItem;
+begin
+  Data := TDataItem.Create(True);
+  try
+    Regions := TDataItem.Create(TDataKind.dkText, 'Country');
+    Values := TDataItem.Create(TDataKind.dkDouble, 'Value');
+
+    Data.Items.Add(Regions);
+    Data.Items.Add(Values);
+    Data.Resize(5);
+
+    // Fill with data
+    Regions.TextData[0] := 'USA';
+    Values.DoubleData[0] := 1000;
+
+    Regions.TextData[1] := 'Canada';
+    Values.DoubleData[1] := 800;
+
+    // ... more countries ...
+
+    BIChart1.Data := Data;
+  finally
+    // Data is owned by BIChart now
+  end;
+end;
+```
+
+## Performance Tips
+
+<CardGroup cols={2}>
+  <Card title="Disable Marks" icon="tag">
+    For maps with many regions:
+    ```pascal
+    WorldSeries.Marks.Visible := False;
+    ```
+  </Card>
+  <Card title="Use Color Ranges" icon="palette">
+    Color ranges are faster than palettes:
+    ```pascal
+    WorldSeries.UseColorRange := True;
+    ```
+  </Card>
+  <Card title="Disable 3D" icon="cube">
+    2D rendering is significantly faster:
+    ```pascal
+    BIChart1.Chart.View3D := False;
+    ```
+  </Card>
+  <Card title="Optimize Renderer" icon="bolt">
+    Use Skia for quality or GDI+ for speed
+  </Card>
+</CardGroup>
+
+## See Also
+
+- [Charts](/examples/charts) - Chart customization
+- [Group By](/examples/group-by) - Aggregate by region
+- [SQL Queries](/examples/sql-queries) - Query geographic data
+- [Grids](/examples/grids) - Display map data in grids

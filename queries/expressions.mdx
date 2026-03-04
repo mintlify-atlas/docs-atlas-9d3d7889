@@ -1,0 +1,419 @@
+---
+title: 'Query Expressions'
+description: 'Using expressions in TeeBI queries and filters'
+---
+
+TeeBI supports powerful expression syntax in queries for calculations, transformations, and filtering.
+
+## Expression Types
+
+TeeBI provides several expression classes defined in BI.Expression.pas:
+
+- `TIntegerExpression` - Integer constants
+- `TFloatExpression` - Floating-point constants
+- `TTextExpression` - String constants
+- `TBooleanExpression` - Boolean constants
+- `TDateTimeExpression` - Date/time constants
+- `TDataItemExpression` - Reference to data field
+- `TArithmeticExpression` - Math operations (+, -, *, /, mod, ^)
+- `TLogicalExpression` - Comparison and logical operations
+- `TMathExpression` - Math functions (sin, cos, sqrt, etc.)
+- `TUnaryTextExpression` - Text functions (upper, lower, trim, etc.)
+
+## Arithmetic Expressions
+
+### Basic Operations
+
+```pascal
+// Addition
+Result := TBISQL.From(Data, 'Price + Tax as Total');
+
+// Subtraction
+Result := TBISQL.From(Data, 'Revenue - Cost as Profit');
+
+// Multiplication
+Result := TBISQL.From(Data, 'Price * Quantity as Total');
+
+// Division
+Result := TBISQL.From(Data, 'Total / Quantity as Average');
+
+// Modulo
+Result := TBISQL.From(Data, 'OrderID mod 10 as LastDigit');
+
+// Power
+Result := TBISQL.From(Data, 'Base ^ Exponent as Result');
+```
+
+See [TArithmeticExpression](/queries/expressions#arithmetic) at BI.Expression.pas:206.
+
+### Operator Precedence
+
+1. `^` (Power)
+2. `*`, `/`, `mod` (Multiply, Divide, Modulo)
+3. `+`, `-` (Add, Subtract)
+
+Use parentheses to override precedence:
+
+```pascal
+Result := TBISQL.From(Data, '(Price + Tax) * Quantity as Total');
+```
+
+## Logical Operators
+
+### Comparison Operators
+
+```pascal
+// Equal
+Result := TBISQL.From(Data, 'Name where Status = "Active"');
+
+// Not equal
+Result := TBISQL.From(Data, 'Name where Status <> "Inactive"');
+
+// Greater than
+Result := TBISQL.From(Data, 'Name where Price > 100');
+
+// Less than
+Result := TBISQL.From(Data, 'Name where Stock < 10');
+
+// Greater or equal
+Result := TBISQL.From(Data, 'Name where Price >= 100');
+
+// Less or equal
+Result := TBISQL.From(Data, 'Name where Stock <= 10');
+```
+
+See [TLogicalExpression](/queries/expressions#logical) at BI.Expression.pas:238.
+
+### Boolean Operators
+
+```pascal
+// AND
+Result := TBISQL.From(Data, 
+  'Name where (Price > 100) and (Stock > 0)');
+
+// OR
+Result := TBISQL.From(Data, 
+  'Name where (Category = "A") or (Category = "B")');
+
+// NOT
+Result := TBISQL.From(Data, 
+  'Name where not (Status = "Inactive")');
+```
+
+### IN Operator
+
+```pascal
+// Static list
+Result := TBISQL.From(Data, 
+  'Name where Status in ["Active", "Pending", "New"]');
+
+// Sub-query
+Result := TBISQL.From(Data,
+  'Name where CategoryID in select ID from Categories where Active=true');
+```
+
+See [LeftInRight](/queries/expressions#in-operator) at BI.Expression.pas:769.
+
+## Math Functions
+
+Supported mathematical functions:
+
+```pascal
+// Absolute value
+Result := TBISQL.From(Data, 'abs(Value)');
+
+// Trigonometric
+Result := TBISQL.From(Data, 'sin(Angle), cos(Angle), tan(Angle)');
+
+// Square and square root
+Result := TBISQL.From(Data, 'sqr(X), sqrt(Y)');
+
+// Logarithms
+Result := TBISQL.From(Data, 'log(Value), ln(Value)');
+
+// Exponential
+Result := TBISQL.From(Data, 'exp(Power)');
+
+// Rounding
+Result := TBISQL.From(Data, 'round(Price), trunc(Price)');
+
+// Sign
+Result := TBISQL.From(Data, 'sign(Balance)');
+
+// Power
+Result := TBISQL.From(Data, 'power(Base, Exponent)');
+```
+
+See [TMathExpression](/queries/expressions#math-functions) at BI.Expression.pas:368.
+
+## Text Functions
+
+### Case Conversion
+
+```pascal
+// Uppercase
+Result := TBISQL.From(Data, 'upper(Name)');
+
+// Lowercase  
+Result := TBISQL.From(Data, 'lower(Name)');
+```
+
+### String Operations
+
+```pascal
+// Trim whitespace
+Result := TBISQL.From(Data, 'trim(Description)');
+
+// String length
+Result := TBISQL.From(Data, 'length(Name)');
+
+// Check if empty
+Result := TBISQL.From(Data, 'Name where not isempty(Email)');
+```
+
+See [TUnaryTextExpression](/queries/expressions#text-functions) at BI.Expression.pas:505.
+
+### Text Comparison
+
+```pascal
+// Starts with
+Result := TBISQL.From(Data, 'Name where Name starts "Pro"');
+
+// Ends with
+Result := TBISQL.From(Data, 'Name where Email ends ".com"');
+
+// Contains
+Result := TBISQL.From(Data, 'Name where Description contains "premium"');
+```
+
+See [TTextLogicalExpression](/queries/expressions#text-comparison) at BI.Expression.pas:532.
+
+## Date/Time Functions
+
+### Date Parts
+
+```pascal
+// Year
+Result := TBISQL.From(Data, 'year(OrderDate)');
+
+// Month
+Result := TBISQL.From(Data, 'month(OrderDate)');
+
+// Day
+Result := TBISQL.From(Data, 'day(OrderDate)');
+
+// Quarter
+Result := TBISQL.From(Data, 'quarter(OrderDate)');
+
+// Week of year
+Result := TBISQL.From(Data, 'weekofyear(OrderDate)');
+
+// Day of year
+Result := TBISQL.From(Data, 'dayofyear(OrderDate)');
+
+// Weekday
+Result := TBISQL.From(Data, 'weekday(OrderDate)');
+```
+
+See [TDateTimePartExpression](/queries/expressions#datetime-parts) at BI.Expression.pas:473.
+
+### Time Parts
+
+```pascal
+// Hour
+Result := TBISQL.From(Data, 'hour(Timestamp)');
+
+// Minute
+Result := TBISQL.From(Data, 'minute(Timestamp)');
+
+// Second
+Result := TBISQL.From(Data, 'second(Timestamp)');
+
+// Millisecond
+Result := TBISQL.From(Data, 'millisecond(Timestamp)');
+```
+
+### Date/Time Constants
+
+```pascal
+// Current date/time
+Result := TBISQL.From(Data, 'Name where OrderDate > now');
+
+// Current date (no time)
+Result := TBISQL.From(Data, 'Name where OrderDate = date');
+
+// Pi and E constants
+Result := TBISQL.From(Data, 'pi * Radius * Radius as Area');
+Result := TBISQL.From(Data, 'e ^ X as ExpX');
+```
+
+## Sub-Queries
+
+Nested SELECT statements:
+
+```pascal
+// Compare to aggregate
+Result := TBISQL.From(Data, 
+  'ProductName, Price where Price > select Average(Price)');
+
+// Multiple sub-queries
+Result := TBISQL.From(Data,
+  'Name where Sales > select Average(Sales) and ' +
+  'Rating >= select Min(Rating) from TopProducts');
+```
+
+Sub-queries are parsed recursively. See [TSQLParser.Parse](/queries/expressions#parse) at BI.SQL.pas:1139.
+
+### Sub-Query Scope
+
+Sub-queries can reference:
+- The same data source as outer query
+- Different data sources (with FROM clause)
+- Use aggregate functions
+
+```pascal
+// Same source
+Result := TBISQL.From(Data, 
+  'Name where Value > select Average(Value)');
+
+// Different source
+Result := TBISQL.From(Data,
+  'Name where CategoryID in select ID from Categories where Active=true');
+```
+
+## Combining Filters
+
+Build complex filters programmatically:
+
+```pascal
+var
+  Filter1, Filter2, Combined: TLogicalExpression;
+begin
+  // Price > 100
+  Filter1 := TLogicalExpression.Create(
+    TDataItemExpression.Create(MyData['Price']),
+    TLogicalOperand.Greater,
+    TIntegerExpression.Create(100)
+  );
+  
+  // Stock > 0
+  Filter2 := TLogicalExpression.Create(
+    TDataItemExpression.Create(MyData['Stock']),
+    TLogicalOperand.Greater,
+    TIntegerExpression.Create(0)
+  );
+  
+  // Combine with AND
+  Combined := TLogicalExpression.Join(Filter1, Filter2, TLogicalOperand.&And);
+end;
+```
+
+See [TLogicalExpression.Join](/queries/expressions#join) at BI.Expression.pas:737.
+
+## Expression Parsing
+
+Parse string expressions:
+
+```pascal
+var
+  Expr: TExpression;
+begin
+  // Parse expression
+  Expr := TExpression.FromString('Price * Quantity');
+  try
+    // Evaluate
+    Value := Expr.Value;
+  finally
+    Expr.Free;
+  end;
+end;
+```
+
+See [TExpression.FromString](/queries/expressions#fromstring) at BI.Expression.pas:68.
+
+## Custom Expressions
+
+Create custom expression classes:
+
+```pascal
+type
+  TCustomExpression = class(TExpression)
+  public
+    function Value: TData; override;
+    function ToString: String; override;
+  end;
+
+function TCustomExpression.Value: TData;
+begin
+  // Your custom calculation
+  Result := ...;
+end;
+
+function TCustomExpression.ToString: String;
+begin
+  Result := 'Custom(...)';
+end;
+```
+
+## Expression Constants
+
+Common constants:
+
+```pascal
+// Boolean
+Result := TBISQL.From(Data, 'Name where Active = true');
+Result := TBISQL.From(Data, 'Name where Active = false');
+
+// Null check
+Result := TBISQL.From(Data, 'Name where Email <> null');
+
+// Math constants
+Result := TBISQL.From(Data, 'pi');
+Result := TBISQL.From(Data, 'e');
+```
+
+## Expression Evaluation
+
+Evaluate expressions without queries:
+
+```pascal
+var
+  Value: TData;
+begin
+  Value := TExpression.Evaluate('2 + 2 * 3'); // Returns 8
+  Value := TExpression.Evaluate('upper("hello")'); // Returns "HELLO"
+end;
+```
+
+See [TExpression.Evaluate](/queries/expressions#evaluate) at BI.Expression.pas:1784.
+
+## IF Expressions
+
+Conditional expressions:
+
+```pascal
+// Syntax: condition ? then_value : else_value
+Result := TBISQL.From(Data, 
+  'Name, (Stock > 0 ? "In Stock" : "Out of Stock") as Status');
+```
+
+See [TIfExpression](/queries/expressions#if) at BI.Expression.pas:592.
+
+## Array Expressions
+
+Arrays in expressions:
+
+```pascal
+// IN operator with array
+Result := TBISQL.From(Data, 
+  'Name where Category in ["A", "B", "C"]');
+
+// Array constants
+Expr := TArrayExpression.Create([
+  TIntegerExpression.Create(1),
+  TIntegerExpression.Create(2),
+  TIntegerExpression.Create(3)
+]);
+```
+
+See [TArrayExpression](/queries/expressions#arrays) at BI.Expression.pas:156.

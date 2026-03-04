@@ -1,0 +1,377 @@
+---
+title: Expressions
+description: Create custom calculations, functions, and expressions for data transformation
+---
+
+TeeBI's expression engine enables custom calculations and user-defined functions.
+
+## Built-in Functions
+
+```pascal
+uses BI.SQL;
+
+var Result: TDataItem;
+
+// Math functions
+Result := TBISQL.From(Data, 'sqrt(Value), abs(Value), round(Value, 2)');
+
+// String functions
+Result := TBISQL.From(Data, 
+  'upper(Name), lower(Name), trim(Name), length(Name)');
+
+// Date functions
+Result := TBISQL.From(Data, 
+  'year(OrderDate), month(OrderDate), day(OrderDate), dayofweek(OrderDate)');
+
+// Conditional
+Result := TBISQL.From(Data,
+  'case when Price > 100 then "Expensive" else "Affordable" end');
+```
+
+## Creating Custom Functions
+
+```pascal
+uses BI.Expression, BI.Expression.Custom;
+
+// Define custom function class
+type
+  THypot = class(TFunctionExpression)
+  public
+    class function Name: String; override;
+    class function ParamCount: TParamCount; override;
+    function Value: TData; override;
+  end;
+
+class function THypot.Name: String;
+begin
+  Result := 'hypot';  // Function name in SQL
+end;
+
+class function THypot.ParamCount: TParamCount;
+begin
+  Result.Min := 2;  // Requires exactly 2 parameters
+  Result.Max := 2;
+end;
+
+function THypot.Value: TData;
+var
+  X, Y: Double;
+begin
+  // Get parameter values
+  X := Parameters[0].Value;
+  Y := Parameters[1].Value;
+
+  // Calculate hypotenuse
+  Result := Sqrt(X * X + Y * Y);
+end;
+```
+
+## Registering Custom Functions
+
+```pascal
+initialization
+  // Register function globally
+  TExpression.RegisterFunction(THypot);
+```
+
+## Using Custom Functions
+
+```pascal
+// In SQL queries
+Result := TBISQL.From(Data, 'select hypot(X, Y), X, Y');
+
+// By code
+var
+  HypotExpr: THypot;
+begin
+  HypotExpr := THypot.Create([3, 4]);
+  try
+    ShowMessage('Result: ' + FloatToStr(HypotExpr.Value));
+    // Output: Result: 5
+  finally
+    HypotExpr.Free;
+  end;
+end;
+
+// From string expression
+var
+  Expr: TExpression;
+begin
+  Expr := TExpression.FromString('hypot(3, 4)');
+  try
+    ShowMessage('Result: ' + String(Expr.Value));
+  finally
+    Expr.Free;
+  end;
+end;
+```
+
+## Complete Custom Function Example
+
+```pascal
+uses
+  BI.DataItem, BI.SQL, BI.Expression, BI.Expression.Custom,
+  VCLBI.Grid;
+
+type
+  TFormCustomFunc = class(TForm)
+    BIGrid1: TBIGrid;  // Input data (X, Y columns)
+    BIGrid2: TBIGrid;  // Results
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+  end;
+
+procedure TFormCustomFunc.FormCreate(Sender: TObject);
+var
+  Data: TDataItem;
+  X, Y: TDataItem;
+begin
+  // Create sample data
+  Data := TDataItem.Create(True);
+  X := TDataItem.Create(TDataKind.dkInt32, 'X');
+  Y := TDataItem.Create(TDataKind.dkInt32, 'Y');
+  
+  Data.Items.Add(X);
+  Data.Items.Add(Y);
+  Data.Resize(10);
+
+  // Fill with random values
+  for var I := 0 to 9 do
+  begin
+    X.Int32Data[I] := Random(10);
+    Y.Int32Data[I] := Random(10);
+  end;
+
+  BIGrid1.Data := Data;
+
+  // Use custom hypot function in query
+  BIGrid2.Data := TBISQL.From(Data,
+    'select hypot(X, Y) as Hypotenuse, X*X as XSquared, Y*Y as YSquared, sqrt((X*X)+(Y*Y)) as Verify');
+end;
+
+procedure TFormCustomFunc.FormDestroy(Sender: TObject);
+begin
+  BIGrid2.Data.Free;
+  BIGrid1.Data.Free;
+end;
+```
+
+## Expression Parameters
+
+```pascal
+// Access expression parameters
+function THypot.Value: TData;
+var
+  X, Y: TExpression;
+begin
+  // Parameters are TExpression objects
+  X := Parameters[0];
+  Y := Parameters[1];
+
+  // Evaluate parameter expressions
+  Result := Sqrt(X.Value * X.Value + Y.Value * Y.Value);
+end;
+```
+
+## Variable Parameter Count
+
+```pascal
+type
+  TMaxValue = class(TFunctionExpression)
+  public
+    class function Name: String; override;
+    class function ParamCount: TParamCount; override;
+    function Value: TData; override;
+  end;
+
+class function TMaxValue.ParamCount: TParamCount;
+begin
+  Result.Min := 1;  // At least 1 parameter
+  Result.Max := MaxInt;  // Unlimited parameters
+end;
+
+function TMaxValue.Value: TData;
+var
+  I: Integer;
+  MaxVal, Val: Double;
+begin
+  MaxVal := Parameters[0].Value;
+
+  for I := 1 to High(Parameters) do
+  begin
+    Val := Parameters[I].Value;
+    if Val > MaxVal then
+      MaxVal := Val;
+  end;
+
+  Result := MaxVal;
+end;
+```
+
+## Aggregate Functions
+
+```pascal
+type
+  TCustomAggregate = class(TAggregateExpression)
+  public
+    class function Name: String; override;
+    function Calculate(const AData: TDataItem): TData; override;
+  end;
+
+function TCustomAggregate.Calculate(const AData: TDataItem): TData;
+var
+  Sum: Double;
+  I: Integer;
+begin
+  Sum := 0;
+  for I := 0 to AData.Count - 1 do
+    Sum := Sum + Parameters[0].Value(I);
+
+  Result := Sum / AData.Count;  // Average
+end;
+```
+
+## Expression Evaluation
+
+```pascal
+uses BI.Expression;
+
+// Parse and evaluate expression
+function EvaluateExpression(const ExprStr: String): Variant;
+var
+  Expr: TExpression;
+begin
+  Expr := TExpression.FromString(ExprStr);
+  try
+    Result := Expr.Value;
+  finally
+    Expr.Free;
+  end;
+end;
+
+// Usage
+var V: Variant;
+begin
+  V := EvaluateExpression('(10 + 20) * 3');  // 90
+  V := EvaluateExpression('sqrt(16) + 5');   // 9
+  V := EvaluateExpression('hypot(3, 4)');    // 5
+end;
+```
+
+## Error Handling
+
+```pascal
+uses BI.Expression;
+
+function SafeEvaluate(const ExprStr: String; out ErrorMsg: String): Boolean;
+var
+  Expr: TExpression;
+begin
+  Result := False;
+  ErrorMsg := '';
+
+  try
+    Expr := TExpression.FromString(
+      Data,
+      ExprStr,
+      function(const APos: Integer; const AMessage: String): Boolean
+      begin
+        ErrorMsg := Format('Error at position %d: %s', [APos, AMessage]);
+        Result := True;  // Handle error
+      end
+    );
+
+    if Expr <> nil then
+    try
+      Result := True;
+    finally
+      Expr.Free;
+    end;
+  except
+    on E: Exception do
+      ErrorMsg := E.Message;
+  end;
+end;
+```
+
+## Expression Benchmarking
+
+```pascal
+uses System.Diagnostics;
+
+procedure BenchmarkExpression;
+const
+  Iterations = 100000;
+var
+  Expr: TExpression;
+  Stopwatch: TStopwatch;
+  I: Integer;
+  Result: TData;
+begin
+  Expr := TExpression.FromString('sqrt(X*X + Y*Y)');
+  try
+    Stopwatch := TStopwatch.StartNew;
+
+    for I := 1 to Iterations do
+      Result := Expr.Value;
+
+    ShowMessage(Format('Evaluated %d times in %d ms',
+      [Iterations, Stopwatch.ElapsedMilliseconds]));
+  finally
+    Expr.Free;
+  end;
+end;
+```
+
+## Common Expression Patterns
+
+```pascal
+// Calculate percentage
+'(Value / Total) * 100'
+
+// Running total (use in queries)
+'sum(Amount) over (order by Date)'
+
+// Conditional calculation
+'case when Quantity > 100 then Price * 0.9 else Price end'
+
+// Date difference in days
+'datediff(day, StartDate, EndDate)'
+
+// String concatenation
+'FirstName + " " + LastName'
+
+// Null handling
+'coalesce(Value, 0)'  // Use 0 if Value is null
+
+// Type conversion
+'cast(TextValue as integer)'
+```
+
+## Expression Tree Visualization
+
+```pascal
+uses BI.Expression;
+
+// Get expression structure
+procedure ShowExpressionTree;
+var
+  Expr: TExpression;
+  Tree: String;
+begin
+  Expr := TExpression.FromString('(A + B) * C');
+  try
+    Tree := Expr.ToString;  // Get string representation
+    Memo1.Text := Tree;
+  finally
+    Expr.Free;
+  end;
+end;
+```
+
+## See Also
+
+- [SQL Queries](/examples/sql-queries) - Use expressions in queries
+- [Group By](/examples/group-by) - Aggregate expressions
+- [Filters](/examples/filters) - Filter expressions
+- [Simple Queries](/examples/simple-queries) - Basic calculations

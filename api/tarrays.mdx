@@ -1,0 +1,576 @@
+---
+title: TArrays
+description: Dynamic array types and helper methods for data manipulation
+---
+
+## Overview
+
+The `BI.Arrays` unit provides dynamic array types and powerful helper methods for working with data in TeeBI. These arrays form the foundation of TDataItem's storage mechanism and include extensive functionality for sorting, searching, statistical calculations, and data manipulation.
+
+## Array Types
+
+<ResponseField name="TInt32Array" type="Array of Integer">
+  Dynamic array of 32-bit integers.
+  
+  ```pascal
+  var
+    Numbers: TInt32Array;
+  begin
+    Numbers.Resize(5);
+    Numbers[0] := 10;
+    Numbers[1] := 20;
+  end;
+  ```
+</ResponseField>
+
+<ResponseField name="TInt64Array" type="Array of Int64">
+  Dynamic array of 64-bit integers.
+</ResponseField>
+
+<ResponseField name="TSingleArray" type="Array of Single">
+  Dynamic array of single-precision floating-point numbers.
+</ResponseField>
+
+<ResponseField name="TDoubleArray" type="Array of Double">
+  Dynamic array of double-precision floating-point numbers (default float type).
+</ResponseField>
+
+<ResponseField name="TExtendedArray" type="Array of Extended">
+  Dynamic array of extended-precision floats (10 bytes on x86, same as Double on x64).
+</ResponseField>
+
+<ResponseField name="TTextArray" type="Array of String">
+  Dynamic array of strings.
+</ResponseField>
+
+<ResponseField name="TDateTimeArray" type="Array of TDateTime">
+  Dynamic array of datetime values.
+</ResponseField>
+
+<ResponseField name="TBooleanArray" type="Array of Boolean">
+  Dynamic array of boolean values.
+</ResponseField>
+
+<ResponseField name="TNativeIntArray" type="TInt32Array or TInt64Array">
+  Platform-dependent integer array (32-bit on x86, 64-bit on x64).
+</ResponseField>
+
+## Common Helper Methods
+
+All array types provide similar helper methods through record helpers. Below are the most commonly used methods:
+
+### Array Management
+
+<ResponseField name="Count" type="function">
+  Returns the number of elements in the array.
+  
+  ```pascal
+  ShowMessage('Elements: ' + IntToStr(Numbers.Count));
+  ```
+</ResponseField>
+
+<ResponseField name="Resize" type="procedure">
+  Changes the size of the array.
+  
+  <ParamField path="ACount" type="TInteger" required>
+    New size for the array
+  </ParamField>
+  
+  ```pascal
+  Numbers.Resize(100); // Resize to 100 elements
+  ```
+</ResponseField>
+
+<ResponseField name="Empty" type="procedure">
+  Clears all elements from the array (sets length to 0).
+  
+  ```pascal
+  Numbers.Empty;
+  ```
+</ResponseField>
+
+<ResponseField name="Append" type="function">
+  Adds a value to the end of the array.
+  
+  <ParamField path="Value" required>
+    The value to append (type matches array type)
+  </ParamField>
+  
+  Returns the index of the newly added element.
+  
+  ```pascal
+  var Index: Integer;
+  Index := Numbers.Append(42);
+  ```
+</ResponseField>
+
+<ResponseField name="Copy" type="function">
+  Creates a copy of the array or a portion of it.
+  
+  <ParamField path="AIndex" type="TInteger">
+    Starting index for partial copy
+  </ParamField>
+  
+  <ParamField path="ACount" type="TInteger">
+    Number of elements to copy
+  </ParamField>
+  
+  ```pascal
+  var Copy1, Copy2: TInt32Array;
+  Copy1 := Numbers.Copy;           // Full copy
+  Copy2 := Numbers.Copy(10, 5);    // Copy 5 elements starting at index 10
+  ```
+</ResponseField>
+
+<ResponseField name="Insert" type="procedure">
+  Inserts a value at the specified position.
+  
+  <ParamField path="Index" type="TInteger" required>
+    Position where to insert
+  </ParamField>
+  
+  <ParamField path="Value" required>
+    Value to insert
+  </ParamField>
+  
+  ```pascal
+  Numbers.Insert(5, 99); // Insert 99 at position 5
+  ```
+</ResponseField>
+
+<ResponseField name="Delete" type="procedure">
+  Removes one or more elements from the array.
+  
+  <ParamField path="Index" type="TInteger" required>
+    Starting index to delete
+  </ParamField>
+  
+  <ParamField path="ACount" type="TInteger" default="1">
+    Number of elements to delete
+  </ParamField>
+  
+  ```pascal
+  Numbers.Delete(10);      // Delete element at index 10
+  Numbers.Delete(5, 3);    // Delete 3 elements starting at index 5
+  ```
+</ResponseField>
+
+<ResponseField name="Reverse" type="procedure">
+  Reverses the order of elements in the array.
+  
+  ```pascal
+  Numbers.Reverse;
+  ```
+</ResponseField>
+
+<ResponseField name="Swap" type="procedure">
+  Swaps two elements in the array.
+  
+  <ParamField path="A" type="TInteger" required>
+    First index
+  </ParamField>
+  
+  <ParamField path="B" type="TInteger" required>
+    Second index
+  </ParamField>
+  
+  ```pascal
+  Numbers.Swap(0, 5); // Swap first and sixth elements
+  ```
+</ResponseField>
+
+### Sorting and Searching
+
+<ResponseField name="Sort" type="procedure">
+  Sorts the array in ascending or descending order.
+  
+  <ParamField path="Ascending" type="Boolean" default="True">
+    Sort direction
+  </ParamField>
+  
+  <ParamField path="IgnoreCase" type="Boolean" default="False">
+    For text arrays, whether to ignore case
+  </ParamField>
+  
+  ```pascal
+  Numbers.Sort;              // Sort ascending
+  Numbers.Sort(False);       // Sort descending
+  Text.Sort(True, True);     // Sort text case-insensitive
+  ```
+</ResponseField>
+
+<ResponseField name="SortedFind" type="function">
+  Performs binary search on a sorted array.
+  
+  <ParamField path="Value" required>
+    Value to search for
+  </ParamField>
+  
+  <ParamField path="Exists" type="Boolean" output>
+    Returns True if value was found
+  </ParamField>
+  
+  Returns the index where the value is or should be inserted.
+  
+  ```pascal
+  var
+    Index: Integer;
+    Found: Boolean;
+  begin
+    Numbers.Sort; // Must be sorted first
+    Index := Numbers.SortedFind(42, Found);
+    if Found then
+      ShowMessage('Found at index: ' + IntToStr(Index));
+  end;
+  ```
+</ResponseField>
+
+<ResponseField name="IndexOf" type="function">
+  Finds the first occurrence of a value (linear search).
+  
+  <ParamField path="Value" required>
+    Value to search for
+  </ParamField>
+  
+  Returns the index of the value, or -1 if not found.
+  
+  ```pascal
+  var Index: Integer;
+  Index := Numbers.IndexOf(42);
+  if Index >= 0 then
+    ShowMessage('Found at: ' + IntToStr(Index));
+  ```
+</ResponseField>
+
+### Statistical Methods (Numeric Arrays)
+
+<ResponseField name="Stats" type="function">
+  Calculates comprehensive statistics for the array.
+  
+  Returns a statistics object (TInt32Stats, TDoubleStats, etc.) containing:
+  - Min, Max: Minimum and maximum values
+  - Mean: Average value
+  - Median: Middle value
+  - Mode: Most frequent value
+  - Range: Difference between max and min
+  - Variance: Statistical variance
+  - StdDeviation: Standard deviation
+  - Skewness: Distribution skewness
+  - Peakedness: Distribution kurtosis
+  
+  ```pascal
+  var S: TInt32Stats;
+  S := Numbers.Stats;
+  ShowMessage('Mean: ' + FloatToStr(S.Mean));
+  ShowMessage('Min: ' + IntToStr(S.Min));
+  ShowMessage('Max: ' + IntToStr(S.Max));
+  S.Free;
+  ```
+</ResponseField>
+
+<ResponseField name="Sum" type="function">
+  Calculates the sum of all values.
+  
+  ```pascal
+  ShowMessage('Total: ' + FloatToStr(Numbers.Sum));
+  ```
+</ResponseField>
+
+<ResponseField name="Mean" type="function">
+  Calculates the average value.
+  
+  ```pascal
+  ShowMessage('Average: ' + FloatToStr(Numbers.Mean));
+  ```
+</ResponseField>
+
+<ResponseField name="Minimum" type="function">
+  Returns the minimum value in the array.
+  
+  ```pascal
+  ShowMessage('Min: ' + IntToStr(Numbers.Minimum));
+  ```
+</ResponseField>
+
+<ResponseField name="Maximum" type="function">
+  Returns the maximum value in the array.
+  
+  ```pascal
+  ShowMessage('Max: ' + IntToStr(Numbers.Maximum));
+  ```
+</ResponseField>
+
+<ResponseField name="Variance" type="function">
+  Calculates variance given a mean.
+  
+  <ParamField path="Mean" type="TFloat" required>
+    The mean value
+  </ParamField>
+  
+  ```pascal
+  var M, V: Double;
+  M := Numbers.Mean;
+  V := Numbers.Variance(M);
+  ```
+</ResponseField>
+
+<ResponseField name="StdDeviation" type="function">
+  Calculates standard deviation given a mean.
+  
+  <ParamField path="Mean" type="TFloat" required>
+    The mean value
+  </ParamField>
+  
+  ```pascal
+  var M, SD: Double;
+  M := Numbers.Mean;
+  SD := Numbers.StdDeviation(M);
+  ```
+</ResponseField>
+
+## Usage Examples
+
+### Basic Array Operations
+
+```pascal
+var
+  Numbers: TInt32Array;
+  I: Integer;
+begin
+  // Create and populate
+  Numbers.Resize(5);
+  Numbers[0] := 10;
+  Numbers[1] := 30;
+  Numbers[2] := 20;
+  Numbers[3] := 50;
+  Numbers[4] := 40;
+  
+  // Append more values
+  Numbers.Append(60);
+  Numbers.Append(15);
+  
+  ShowMessage('Count: ' + IntToStr(Numbers.Count)); // 7
+  
+  // Sort
+  Numbers.Sort;
+  
+  // Display sorted
+  for I := 0 to Numbers.Count - 1 do
+    ShowMessage(IntToStr(Numbers[I]));
+  // Shows: 10, 15, 20, 30, 40, 50, 60
+end;
+```
+
+### Statistical Analysis
+
+```pascal
+var
+  Values: TDoubleArray;
+  Stats: TDoubleStats;
+begin
+  // Populate with data
+  Values.Resize(100);
+  for var I := 0 to 99 do
+    Values[I] := Random * 100;
+  
+  // Calculate statistics
+  Stats := Values.Stats;
+  try
+    ShowMessage('Count: ' + IntToStr(Values.Count));
+    ShowMessage('Mean: ' + FloatToStr(Stats.Mean));
+    ShowMessage('Median: ' + FloatToStr(Stats.Median));
+    ShowMessage('Min: ' + FloatToStr(Stats.Min));
+    ShowMessage('Max: ' + FloatToStr(Stats.Max));
+    ShowMessage('Range: ' + FloatToStr(Stats.Range));
+    ShowMessage('StdDev: ' + FloatToStr(Stats.StdDeviation));
+  finally
+    Stats.Free;
+  end;
+end;
+```
+
+### Text Array Operations
+
+```pascal
+var
+  Names: TTextArray;
+  Index: Integer;
+  Found: Boolean;
+begin
+  // Add names
+  Names.Append('Alice');
+  Names.Append('Bob');
+  Names.Append('Charlie');
+  Names.Append('David');
+  
+  // Sort alphabetically (case-insensitive)
+  Names.Sort(True, True);
+  
+  // Search
+  Index := Names.SortedFind('charlie', Found, True);
+  if Found then
+    ShowMessage('Found at index: ' + IntToStr(Index));
+  
+  // Insert in sorted position
+  Names.Insert(Index, 'Carlos');
+end;
+```
+
+### Copying and Filtering
+
+```pascal
+var
+  Source, Filtered: TInt32Array;
+  I: Integer;
+begin
+  // Create source array
+  Source.Resize(10);
+  for I := 0 to 9 do
+    Source[I] := I * 10; // 0, 10, 20, ..., 90
+  
+  // Filter: copy only values > 40
+  for I := 0 to Source.Count - 1 do
+    if Source[I] > 40 then
+      Filtered.Append(Source[I]);
+  
+  ShowMessage('Filtered count: ' + IntToStr(Filtered.Count));
+  // Shows: 5 (values 50, 60, 70, 80, 90)
+end;
+```
+
+### DateTime Array
+
+```pascal
+var
+  Dates: TDateTimeArray;
+  Stats: TDateTimeStats;
+begin
+  // Add dates
+  Dates.Append(EncodeDate(2024, 1, 15));
+  Dates.Append(EncodeDate(2024, 3, 20));
+  Dates.Append(EncodeDate(2024, 2, 10));
+  Dates.Append(EncodeDate(2024, 4, 5));
+  
+  // Sort chronologically
+  Dates.Sort;
+  
+  // Get statistics
+  Stats := Dates.Stats;
+  try
+    ShowMessage('Earliest: ' + DateToStr(Stats.Min));
+    ShowMessage('Latest: ' + DateToStr(Stats.Max));
+    ShowMessage('Median: ' + DateToStr(Stats.Median));
+  finally
+    Stats.Free;
+  end;
+end;
+```
+
+### Working with Missing Values
+
+```pascal
+var
+  Values: TDoubleArray;
+  Missing: TBooleanArray;
+  Filtered: TDoubleArray;
+  I: Integer;
+begin
+  // Create arrays
+  Values.Resize(5);
+  Missing.Resize(5);
+  
+  Values[0] := 10.0;
+  Missing[0] := False;
+  
+  Values[1] := 0.0;
+  Missing[1] := True;  // Missing
+  
+  Values[2] := 20.0;
+  Missing[2] := False;
+  
+  Values[3] := 0.0;
+  Missing[3] := True;  // Missing
+  
+  Values[4] := 30.0;
+  Missing[4] := False;
+  
+  // Copy only non-missing values
+  Filtered := Values.Copy(Missing);
+  
+  ShowMessage('Valid values: ' + IntToStr(Filtered.Count));
+  // Shows: 3
+  
+  ShowMessage('Average: ' + FloatToStr(Filtered.Mean));
+  // Shows: 20.0 (average of 10, 20, 30)
+end;
+```
+
+### Advanced: Custom Sort with Callback
+
+```pascal
+type
+  TPerson = record
+    Name: String;
+    Age: Integer;
+  end;
+  TPersonArray = array of TPerson;
+
+var
+  People: TPersonArray;
+  Ages: TInt32Array;
+  
+procedure SwapPeople(const A, B: TInteger);
+var
+  Temp: TPerson;
+begin
+  Temp := People[A];
+  People[A] := People[B];
+  People[B] := Temp;
+end;
+
+begin
+  // Create people array
+  SetLength(People, 3);
+  People[0].Name := 'Alice'; People[0].Age := 30;
+  People[1].Name := 'Bob';   People[1].Age := 25;
+  People[2].Name := 'Carol'; People[2].Age := 35;
+  
+  // Extract ages for sorting
+  Ages.Resize(3);
+  Ages[0] := People[0].Age;
+  Ages[1] := People[1].Age;
+  Ages[2] := People[2].Age;
+  
+  // Sort ages and swap people accordingly
+  Ages.Sort(True, SwapPeople);
+  
+  // Now People array is sorted by age
+  for var I := 0 to High(People) do
+    ShowMessage(People[I].Name + ': ' + IntToStr(People[I].Age));
+  // Shows: Bob: 25, Alice: 30, Carol: 35
+end;
+```
+
+## Performance Tips
+
+<Note>
+  **Pre-allocate with Resize**: Use `Resize` to allocate memory once rather than calling `Append` repeatedly for large datasets.
+</Note>
+
+<Note>
+  **Binary Search**: Always use `SortedFind` on sorted arrays instead of `IndexOf` for O(log n) instead of O(n) search time.
+</Note>
+
+<Note>
+  **In-place Operations**: Methods like `Sort`, `Reverse`, and `Initialize` work in-place without allocating new memory.
+</Note>
+
+<Note>
+  **Copy Overhead**: `Copy` creates a new array; avoid unnecessary copies for large datasets.
+</Note>
+
+## See Also
+
+- [TDataItem](/api/tdataitem) - Uses these arrays for data storage
+- [TDataKind](/api/tdatakind) - Determines which array type is used
+- [TMissingData](/api/tmissingdata) - Uses TBooleanArray for tracking missing values

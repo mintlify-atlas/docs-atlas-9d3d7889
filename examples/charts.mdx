@@ -1,0 +1,393 @@
+---
+title: Charts
+description: Visualize data with automatic chart generation and TeeChart integration
+---
+
+TeeBI automatically creates charts from data with full TeeChart integration.
+
+## Basic Chart Usage
+
+<Tabs>
+  <Tab title="VCL">
+```pascal
+uses
+  BI.DataItem, BI.Persist,
+  VCLBI.Chart;
+
+type
+  TForm1 = class(TForm)
+    BIChart1: TBIChart;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+  private
+    Data: TDataItem;
+  end;
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  // Load data
+  Data := TStore.Load('BISamples', 'Products');
+
+  // Automatic chart creation
+  BIChart1.Data := Data;
+
+  // Configure chart
+  BIChart1.Chart.View3D := False;
+  BIChart1.Chart.Legend.Visible := True;
+end;
+
+procedure TForm1.FormDestroy(Sender: TObject);
+begin
+  Data.Free;
+end;
+```
+  </Tab>
+  <Tab title="FMX">
+```pascal
+uses
+  BI.DataItem, BI.Persist,
+  FMXBI.Chart;
+
+type
+  TForm1 = class(TForm)
+    BIChart1: TBIChart;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+  private
+    Data: TDataItem;
+  end;
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  Data := TStore.Load('BISamples', 'Products');
+  
+  // Automatic chart from data
+  BIChart1.Data := Data;
+  
+  BIChart1.Chart.View3D := False;
+end;
+
+procedure TForm1.FormDestroy(Sender: TObject);
+begin
+  Data.Free;
+end;
+```
+  </Tab>
+</Tabs>
+
+## Chart from Query Results
+
+```pascal
+uses
+  BI.DataItem, BI.SQL, BI.Persist,
+  VCLBI.Chart, VCLBI.Grid;
+
+procedure ShowSalesByCategory;
+var
+  Data, Result: TDataItem;
+begin
+  Data := TStore.Load('SQLite_Demo');
+
+  // Query: sum by category
+  Result := TBISQL.From(Data,
+    'sum("Order Details".Quantity * "Order Details".UnitPrice) as Revenue ' +
+    'group by Products.Category');
+
+  // Show in chart
+  BIChart1.Data := Result;
+
+  // Also show in grid
+  BIGrid1.Data := Result;
+end;
+```
+
+## Customize Chart Appearance
+
+```pascal
+procedure CustomizeChart;
+begin
+  with BIChart1.Chart do
+  begin
+    // General
+    Title.Text.Text := 'Sales by Category';
+    View3D := False;
+    Legend.Alignment := laBottom;
+
+    // Axes
+    Axes.Bottom.Title.Caption := 'Category';
+    Axes.Bottom.Labels.Angle := 90;
+    Axes.Left.Title.Caption := 'Revenue';
+
+    // Background
+    Color := clWhite;
+    Gradient.Visible := False;
+    BackWall.Hide;
+
+    // Border
+    BorderStyle := bsSingle;
+    BevelOuter := bvNone;
+  end;
+end;
+```
+
+## Chart Types
+
+```pascal
+uses VCLTee.Series;
+
+// TeeBI automatically selects chart type, but you can override:
+
+procedure SetChartType;
+begin
+  BIChart1.SeriesType := TBarSeries;     // Bar chart
+  BIChart1.SeriesType := TLineSeries;    // Line chart
+  BIChart1.SeriesType := TPieSeries;     // Pie chart
+  BIChart1.SeriesType := TAreaSeries;    // Area chart
+  BIChart1.SeriesType := TPointSeries;   // Scatter plot
+end;
+```
+
+## Multiple Series
+
+```pascal
+// BIChart automatically creates series for multi-dimensional data
+var
+  Result: TDataItem;
+begin
+  // Group by two dimensions creates multiple series
+  Result := TBISQL.From(Data,
+    'sum(Sales) group by Year, Region');
+
+  BIChart1.Data := Result;
+  // Creates one series per Region, grouped by Year
+end;
+```
+
+## Manual Chart Population
+
+```pascal
+uses VCLTee.Series;
+
+procedure PopulateChartManually;
+var
+  Series: TBarSeries;
+  I: Integer;
+begin
+  BIChart1.Chart.RemoveAllSeries;
+
+  Series := TBarSeries.Create(Self);
+  BIChart1.Chart.AddSeries(Series);
+
+  Series.Clear;
+
+  // Add values from data
+  for I := 0 to Data.Count - 1 do
+    Series.Add(
+      Data['Amount'].DoubleData[I],
+      Data['Category'].TextData[I],
+      clTeeColor
+    );
+end;
+```
+
+## TeeChart Integration
+
+```pascal
+uses VCLBI.Chart.Source;
+
+// Connect TeeChart Series to TeeBI data
+type
+  TForm1 = class(TForm)
+    Chart1: TChart;
+    Series1: TBarSeries;
+    TeeBISource1: TTeeBISource;
+    procedure FormCreate(Sender: TObject);
+  end;
+
+procedure TForm1.FormCreate(Sender: TObject);
+var
+  Animals: TDataItem;
+begin
+  Animals := TStore.Load('Animals')['Animals'];
+
+  // Connect data source
+  TeeBISource1.Data := Animals;
+  TeeBISource1.Open;
+
+  // Link series to source
+  Series1.DataSource := TeeBISource1;
+  Series1.MandatoryValueList.ValueSource := 'Weight';
+  Series1.XLabelsSource := 'Name';
+  Series1.ColorSource := 'Color';
+end;
+```
+
+## Chart Editor
+
+```pascal
+uses VCLBI.Editor.Chart;
+
+// Show chart editor dialog
+procedure EditChart;
+begin
+  TBIChartEditor.Edit(Self, BIChart1);
+end;
+
+// Or use standard TeeChart editor
+uses VCLTee.EditChar;
+
+procedure EditTeeChart;
+begin
+  EditChart(Self, BIChart1.Chart);
+end;
+```
+
+## Export Charts
+
+```pascal
+uses
+  VCLTee.TeeJPEG, VCLTee.TeePNG, VCLTee.TeeGIF,
+  VCLTee.TeePDFCanvas, VCLTee.TeeSVGCanvas;
+
+// Export to image
+procedure ExportToImage;
+begin
+  BIChart1.Chart.SaveToBitmapFile('chart.bmp');
+  BIChart1.Chart.SaveToJPEGFile('chart.jpg');
+  BIChart1.Chart.SaveToPNGFile('chart.png');
+  BIChart1.Chart.SaveToGIFFile('chart.gif');
+end;
+
+// Export to PDF
+procedure ExportToPDF;
+begin
+  BIChart1.Chart.SaveToPDFFile('chart.pdf');
+end;
+
+// Export to SVG
+procedure ExportToSVG;
+begin
+  BIChart1.Chart.SaveToSVGFile('chart.svg');
+end;
+```
+
+## Complete Example with Query
+
+```pascal
+uses
+  BI.DataItem, BI.SQL, BI.Persist, BI.Query,
+  VCLBI.Chart, VCLBI.Grid,
+  VCLBI.Editor.Chart, VCLBI.Editor.Query;
+
+type
+  TChartForm = class(TForm)
+    BIChart1: TBIChart;
+    BIGrid1: TBIGrid;
+    BIQuery1: TBIQuery;
+    Splitter1: TSplitter;
+    BtnEditChart: TButton;
+    BtnEditQuery: TButton;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure BtnEditChartClick(Sender: TObject);
+    procedure BtnEditQueryClick(Sender: TObject);
+  private
+    Data, QueryResult: TDataItem;
+    procedure RefreshQuery;
+  end;
+
+procedure TChartForm.FormCreate(Sender: TObject);
+begin
+  // Load data
+  Data := TStore.Load('BISamples', 'Products');
+
+  // Setup query
+  BIQuery1.Parse(Data, 'sum(Stock) group by Category, Color');
+
+  // Execute and display
+  RefreshQuery;
+
+  // Configure chart
+  BIChart1.Chart.View3D := False;
+  BIChart1.Chart.Axes.Bottom.Labels.Angle := 90;
+  BIChart1.Chart.Title.Text.Text := 'Stock by Category and Color';
+end;
+
+procedure TChartForm.RefreshQuery;
+begin
+  QueryResult.Free;
+  QueryResult := BIQuery1.Calculate;
+
+  BIGrid1.Data := QueryResult;
+  BIChart1.Data := QueryResult;
+end;
+
+procedure TChartForm.BtnEditChartClick(Sender: TObject);
+begin
+  TBIChartEditor.Edit(Self, BIChart1);
+end;
+
+procedure TChartForm.BtnEditQueryClick(Sender: TObject);
+begin
+  if TBIQueryEditor.Edit(Self, BIQuery1) then
+    RefreshQuery;
+end;
+
+procedure TChartForm.FormDestroy(Sender: TObject);
+begin
+  QueryResult.Free;
+  Data.Free;
+end;
+```
+
+## Chart Events
+
+```pascal
+procedure TForm1.BIChart1Click(Sender: TCustomChartSeries; ValueIndex: Integer;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  // Handle series click
+  ShowMessage(Format('Clicked: %s = %g',
+    [Sender.Labels[ValueIndex], Sender.YValue[ValueIndex]]));
+end;
+
+procedure TForm1.BIChart1AddSeries(Sender: TCustomChartSeries);
+begin
+  // Called when BIChart creates a new series
+  Sender.Marks.Visible := True;
+  Sender.ShowInLegend := True;
+end;
+```
+
+## Performance Tips
+
+<AccordionGroup>
+  <Accordion title="Large Datasets">
+    For datasets with thousands of points:
+    - Use FastLine series instead of Line
+    - Disable marks for better performance
+    - Consider data sampling/downsampling
+  </Accordion>
+  
+  <Accordion title="Real-time Updates">
+    ```pascal
+    BIChart1.Chart.AutoRepaint := False;
+    // ... update data ...
+    BIChart1.Chart.Invalidate;
+    ```
+  </Accordion>
+  
+  <Accordion title="3D Charts">
+    3D rendering is slower. Disable if not needed:
+    ```pascal
+    BIChart1.Chart.View3D := False;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+- [Grids](/examples/grids) - Display data in grids
+- [Group By](/examples/group-by) - Create aggregated charts
+- [Geographic Maps](/examples/geographic-maps) - Map visualizations
+- [Pivot Tables](/examples/pivot-tables) - Multi-dimensional charts

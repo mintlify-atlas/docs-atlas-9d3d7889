@@ -1,0 +1,409 @@
+---
+title: 'Aggregation Functions'
+description: 'Using SUM, COUNT, AVG, MIN, MAX and other aggregations in TeeBI'
+---
+
+TeeBI provides powerful aggregation functions for summarizing data, similar to SQL aggregate functions.
+
+## Available Aggregations
+
+From [BI.Summary.pas:106](/queries/aggregations#taggregate):
+
+```pascal
+type
+  TAggregate = (
+    Count,      // Count rows or non-null values
+    Sum,        // Sum values
+    Average,    // Average (mean) values  
+    Minimum,    // Minimum value
+    Maximum,    // Maximum value
+    First,      // First value
+    Last        // Last value
+  );
+```
+
+## Basic Aggregations
+
+### COUNT
+
+Count rows or non-null values:
+
+```pascal
+// Count all rows
+Result := TBISQL.From(Data, 'count(*) group by Country');
+
+// Count non-null values
+Result := TBISQL.From(Data, 'count(Email) group by Country');
+```
+
+### SUM
+
+Sum numeric values:
+
+```pascal
+Result := TBISQL.From(Data, 'sum(Sales) group by Country');
+
+// Multiple sums
+Result := TBISQL.From(Data, 
+  'sum(Sales), sum(Profit) group by Country');
+```
+
+### AVERAGE
+
+Calculate mean values:
+
+```pascal
+Result := TBISQL.From(Data, 'average(Price) group by Category');
+
+// Also works with 'avg'
+Result := TBISQL.From(Data, 'avg(Rating) group by Product');
+```
+
+### MIN and MAX
+
+Find minimum and maximum values:
+
+```pascal
+Result := TBISQL.From(Data, 
+  'min(Price), max(Price) group by Category');
+```
+
+### FIRST and LAST
+
+Get first or last value in group:
+
+```pascal
+Result := TBISQL.From(Data, 
+  'first(OrderDate), last(OrderDate) group by Customer');
+```
+
+## TMeasure Class
+
+Programmatic measure creation. See [BI.Summary.pas:194](/queries/aggregations#tmeasure).
+
+```pascal
+var
+  Summary: TSummary;
+  Measure: TMeasure;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    // Add measure
+    Measure := Summary.Measures.Add(
+      MyData['Sales'],
+      TAggregate.Sum
+    );
+    
+    Summary.By.Add(MyData['Country']);
+    Result := Summary.Calculate;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+### Measure Properties
+
+- `Data` - TDataItem to aggregate
+- `Expression` - Optional expression to aggregate
+- `Aggregate` - Aggregation type (Sum, Count, etc.)
+- `Calculation` - Post-aggregation calculations
+- `Missing` - How to handle null values
+- `Name` - Display name for measure
+
+## Multiple Measures
+
+Aggregate multiple values:
+
+```pascal
+Result := TBISQL.From(Data, 
+  'count(*), sum(Sales), average(Price), min(Stock), max(Stock) group by Category');
+```
+
+### Programmatically
+
+```pascal
+var
+  Summary: TSummary;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    Summary.Measures.Add(MyData['OrderID'], TAggregate.Count);
+    Summary.Measures.Add(MyData['Sales'], TAggregate.Sum);
+    Summary.Measures.Add(MyData['Price'], TAggregate.Average);
+    
+    Summary.By.Add(MyData['Country']);
+    Result := Summary.Calculate;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+## Aggregating Expressions
+
+Aggregate calculated values:
+
+```pascal
+// Sum of expression
+Result := TBISQL.From(Data, 
+  'sum(Price * Quantity) group by Customer');
+
+// Average of expression
+Result := TBISQL.From(Data,
+  'average(Revenue - Cost) group by Product');
+```
+
+### Programmatic Expression Aggregation
+
+```pascal
+var
+  Summary: TSummary;
+  Expr: TExpression;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    // Create expression: Price * Quantity
+    Expr := TArithmeticExpression.Create(
+      TDataItemExpression.Create(MyData['Price']),
+      TArithmeticOperand.Multiply,
+      TDataItemExpression.Create(MyData['Quantity'])
+    );
+    
+    Summary.Measures.Add(Expr, TAggregate.Sum);
+    Summary.By.Add(MyData['Customer']);
+    
+    Result := Summary.Calculate;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+## Measure Calculations
+
+Post-aggregation calculations. See [BI.Summary.pas:176](/queries/aggregations#measure-calculation).
+
+### Percentage Calculations
+
+```pascal
+var
+  Measure: TMeasure;
+begin
+  Measure := Summary.Measures.Add(MyData['Sales'], TAggregate.Sum);
+  
+  // Percentage of column total
+  Measure.Calculation.Percentage := TCalculationPercentage.Column;
+  
+  // Percentage of row total
+  Measure.Calculation.Percentage := TCalculationPercentage.Row;
+  
+  // Percentage of grand total
+  Measure.Calculation.Percentage := TCalculationPercentage.Total;
+end;
+```
+
+### Running Calculations
+
+```pascal
+var
+  Measure: TMeasure;
+begin
+  Measure := Summary.Measures.Add(MyData['Sales'], TAggregate.Sum);
+  
+  // Cumulative sum
+  Measure.Calculation.Running := TCalculationRunning.Cumulative;
+  
+  // Difference from previous
+  Measure.Calculation.Running := TCalculationRunning.Difference;
+  
+  // Direction of running calculation
+  Measure.Calculation.RunningByRows := True; // By rows (default)
+  Measure.Calculation.RunningByRows := False; // By columns
+end;
+```
+
+## Missing Value Handling
+
+Control null value treatment. See [BI.Summary.pas:120](/queries/aggregations#missing-values).
+
+```pascal
+var
+  Measure: TMeasure;
+begin
+  Measure := Summary.Measures.Add(MyData['Sales'], TAggregate.Sum);
+  
+  // Treat nulls as zero
+  Measure.Missing.AsZero := True;
+end;
+```
+
+### Missing Value Behavior
+
+**Default (AsZero = False)**:
+- `Count(Field)` - Skips nulls
+- `Sum` - Skips nulls
+- `Average` - Skips nulls in count
+- `Min/Max` - Ignores nulls
+
+**AsZero = True**:
+- Nulls treated as 0 in calculations
+- Affects Sum and Average results
+
+## HAVING Clause
+
+Filter aggregated results. See [BI.Summary.pas:467](/queries/aggregations#having).
+
+```pascal
+var
+  Summary: TSummary;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    Summary.Measures.Add(MyData['Sales'], TAggregate.Sum);
+    Summary.By.Add(MyData['Country']);
+    
+    // Filter: only countries with sales > 10000
+    Summary.Having.Add('sum(Sales) > 10000');
+    
+    Result := Summary.Calculate;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+### Multiple HAVING Conditions
+
+```pascal
+Summary.Having.Add('sum(Sales) > 10000');
+Summary.Having.Add('count(*) > 100');
+// Implicitly combined with AND
+```
+
+## TBIQuery Measures
+
+Component-based measures. See [BI.Query.pas:111](/queries/aggregations#query-measures).
+
+```pascal
+var
+  Query: TBIQuery;
+  Measure: TQueryMeasure;
+begin
+  Query := TBIQuery.Create(nil);
+  try
+    Query.Data := MyData;
+    Query.Dimensions.Add(MyData['Country']);
+    
+    // Add measure
+    Measure := Query.Measures.Add(
+      MyData['Sales'],
+      TAggregate.Sum
+    );
+    
+    // Configure calculations
+    Measure.Calculation.Percentage := TCalculationPercentage.Total;
+    
+    Result := Query.Calculate;
+  finally
+    Query.Free;
+  end;
+end;
+```
+
+### TQueryMeasure Properties
+
+- `Data` - Field to aggregate
+- `Aggregate` - Aggregation function
+- `Calculation` - Post-aggregation calculations
+- `Missing` - Null value handling
+- `Enabled` - Whether measure is active
+- `Expression` - Optional calculated expression
+
+## Aggregate Performance
+
+### Optimization Tips
+
+1. **Filter before aggregating** - Reduce data size
+2. **Appropriate data types** - Use smallest sufficient type
+3. **Index usage** - Pre-sorted data helps
+
+```pascal
+// Efficient: Filter first
+Result := TBISQL.From(Data,
+  'sum(Sales) where Year=2024 group by Country');
+
+// Less efficient: Aggregate all, filter after
+Result := TBISQL.From(Data,
+  'sum(Sales) group by Country, Year having Year=2024');
+```
+
+### Memory Considerations
+
+Aggregations create:
+- Output data structure (one value per group)
+- Intermediate calculation arrays
+
+Memory usage scales with:
+- Number of groups (cardinality)
+- Number of measures
+- Data types
+
+## Custom Aggregations
+
+Extend TeeBI with custom aggregate functions by inheriting from TMeasure:
+
+```pascal
+type
+  TMedianMeasure = class(TMeasure)
+  public
+    function Calculate: TData; override;
+  end;
+```
+
+## Aggregate with Sub-Queries
+
+Use aggregates in sub-query filters:
+
+```pascal
+// Products above average price
+Result := TBISQL.From(Data,
+  'ProductName, Price where Price > select Average(Price)');
+
+// Top 10% by sales
+Result := TBISQL.From(Data,
+  'ProductName, Sales where Sales > select Average(Sales) * 10');
+```
+
+## Named Aggregations
+
+Provide custom names for measures:
+
+```pascal
+// Using 'as' alias
+Result := TBISQL.From(Data,
+  'sum(Sales) as TotalSales, average(Price) as AvgPrice group by Country');
+```
+
+### Programmatically
+
+```pascal
+var
+  Measure: TMeasure;
+begin
+  Measure := Summary.Measures.Add(MyData['Sales'], TAggregate.Sum);
+  Measure.Name := 'Total Sales';
+end;
+```
+
+## Multi-Level Aggregations
+
+Nested grouping creates hierarchical aggregations:
+
+```pascal
+// Country -> Region -> City
+Result := TBISQL.From(Data,
+  'sum(Sales) group by Country, Region, City');
+```
+
+Each level aggregates from the level below.

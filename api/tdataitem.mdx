@@ -1,0 +1,586 @@
+---
+title: TDataItem
+description: Core class for storing column-based data with support for sub-columns and statistics
+---
+
+## Overview
+
+`TDataItem` is the main class of TeeBI, representing a column of data that can own sub-columns. It's similar to a table column but with support for hierarchical structures. TDataItem can store data of various types (integers, floats, text, datetime, boolean) and provides rich functionality for data manipulation, sorting, and statistical analysis.
+
+## Constructors
+
+<ResponseField name="Create()" type="constructor">
+  Creates a new TDataItem with unknown data kind.
+  
+  ```pascal
+  var Data: TDataItem;
+  Data := TDataItem.Create;
+  ```
+</ResponseField>
+
+<ResponseField name="Create(Table: Boolean)" type="constructor">
+  Creates a new TDataItem, optionally configured as a table.
+  
+  <ParamField path="Table" type="Boolean">
+    Set to True to create a table-mode data item that can contain sub-items
+  </ParamField>
+  
+  ```pascal
+  var Table: TDataItem;
+  Table := TDataItem.Create(True);
+  ```
+</ResponseField>
+
+<ResponseField name="Create(AKind: TDataKind)" type="constructor">
+  Creates a new TDataItem with a specific data kind.
+  
+  <ParamField path="AKind" type="TDataKind">
+    The data type for this column (dkInt32, dkText, etc.)
+  </ParamField>
+  
+  ```pascal
+  var IntColumn: TDataItem;
+  IntColumn := TDataItem.Create(dkInt32);
+  ```
+</ResponseField>
+
+<ResponseField name="Create(AKind: TDataKind; AName: String)" type="constructor">
+  Creates a new TDataItem with a specific data kind and name.
+  
+  <ParamField path="AKind" type="TDataKind">
+    The data type for this column
+  </ParamField>
+  
+  <ParamField path="AName" type="String">
+    The name of the data column
+  </ParamField>
+  
+  ```pascal
+  var AgeColumn: TDataItem;
+  AgeColumn := TDataItem.Create(dkInt32, 'Age');
+  ```
+</ResponseField>
+
+<ResponseField name="Create(AData: TDataArray)" type="constructor">
+  Creates a new TDataItem containing the specified array of sub-items.
+  
+  <ParamField path="AData" type="TDataArray">
+    Array of TDataItem objects to add as sub-items
+  </ParamField>
+</ResponseField>
+
+<ResponseField name="Create(AProvider: TDataProvider)" type="constructor">
+  Creates a new TDataItem with a data provider for lazy loading.
+  
+  <ParamField path="AProvider" type="TDataProvider">
+    Provider responsible for loading data just-in-time
+  </ParamField>
+</ResponseField>
+
+## Properties
+
+<ResponseField name="Count" type="TInteger" required>
+  Returns the number of data values in this item.
+  
+  ```pascal
+  ShowMessage('Rows: ' + IntToStr(Data.Count));
+  ```
+</ResponseField>
+
+<ResponseField name="Name" type="String">
+  The name/label of this data item.
+  
+  ```pascal
+  Data.Name := 'Sales';
+  ```
+</ResponseField>
+
+<ResponseField name="Kind" type="TDataKind">
+  The data type of this item (read-only). Once set, it should never be changed.
+  
+  Possible values:
+  - `dkInt32` - 32-bit integer
+  - `dkInt64` - 64-bit integer
+  - `dkSingle` - Single precision float
+  - `dkDouble` - Double precision float
+  - `dkExtended` - Extended precision float
+  - `dkText` - String/text
+  - `dkDateTime` - Date and time
+  - `dkBoolean` - Boolean
+  - `dkUnknown` - Unknown/unspecified
+  
+  ```pascal
+  if Data.Kind = dkInt32 then
+    ShowMessage('Integer column');
+  ```
+</ResponseField>
+
+<ResponseField name="Parent" type="TDataItem">
+  The parent TDataItem that owns this data item.
+</ResponseField>
+
+<ResponseField name="Items" type="TDataItems">
+  Collection of sub-items (child columns) within this data item.
+  
+  ```pascal
+  for I := 0 to Data.Items.Count - 1 do
+    ShowMessage(Data.Items[I].Name);
+  ```
+</ResponseField>
+
+<ResponseField name="Stats" type="TDataStats">
+  Statistical information about the data (min, max, mean, variance, etc.).
+  
+  ```pascal
+  ShowMessage('Average: ' + FloatToStr(Data.Stats.Mean));
+  ```
+</ResponseField>
+
+<ResponseField name="Missing" type="TMissingData">
+  Manages null/missing values in this data item.
+  
+  ```pascal
+  Data.Missing[5] := True; // Mark row 5 as missing
+  if Data.Missing[10] then
+    ShowMessage('Row 10 has missing data');
+  ```
+</ResponseField>
+
+<ResponseField name="Provider" type="TDataProvider">
+  The object responsible for loading this item's data on-demand.
+</ResponseField>
+
+<ResponseField name="Master" type="TDataItem">
+  The master data item in a master-detail relationship.
+</ResponseField>
+
+<ResponseField name="AsTable" type="Boolean">
+  True when this data represents a table (containing sub-items as columns).
+</ResponseField>
+
+<ResponseField name="Primary" type="Boolean">
+  True when this data is the primary key of its parent.
+</ResponseField>
+
+<ResponseField name="Unique" type="Boolean">
+  True when all values are distinct (no duplicates).
+</ResponseField>
+
+## Data Arrays
+
+Each TDataItem has typed arrays for storing actual data values:
+
+<ResponseField name="Int32Data" type="TInt32Array">
+  Array of 32-bit integers when Kind = dkInt32.
+</ResponseField>
+
+<ResponseField name="Int64Data" type="TInt64Array">
+  Array of 64-bit integers when Kind = dkInt64.
+</ResponseField>
+
+<ResponseField name="SingleData" type="TSingleArray">
+  Array of single-precision floats when Kind = dkSingle.
+</ResponseField>
+
+<ResponseField name="DoubleData" type="TDoubleArray">
+  Array of double-precision floats when Kind = dkDouble.
+</ResponseField>
+
+<ResponseField name="ExtendedData" type="TExtendedArray">
+  Array of extended-precision floats when Kind = dkExtended.
+</ResponseField>
+
+<ResponseField name="TextData" type="TTextArray">
+  Array of strings when Kind = dkText.
+</ResponseField>
+
+<ResponseField name="DateTimeData" type="TDateTimeArray">
+  Array of datetime values when Kind = dkDateTime.
+</ResponseField>
+
+<ResponseField name="BooleanData" type="TBooleanArray">
+  Array of boolean values when Kind = dkBoolean.
+</ResponseField>
+
+## Methods
+
+### Data Manipulation
+
+<ResponseField name="Resize" type="procedure">
+  Changes the size of the data arrays.
+  
+  <ParamField path="Size" type="TInteger" required>
+    The new size for the data arrays
+  </ParamField>
+  
+  ```pascal
+  Data.Resize(100); // Resize to hold 100 rows
+  ```
+</ResponseField>
+
+<ResponseField name="Append" type="function">
+  Adds a new row to the data item with the provided values.
+  
+  <ParamField path="Values" type="Array of Variant" required>
+    Values to append. For table mode, must match column count.
+  </ParamField>
+  
+  Returns the index of the newly added row.
+  
+  ```pascal
+  // For a table with Name, Age, City columns
+  Table.Append(['John', 25, 'NYC']);
+  
+  // For a single column
+  Column.Append([42]);
+  ```
+</ResponseField>
+
+<ResponseField name="Insert" type="procedure">
+  Inserts a new item at the specified position.
+  
+  <ParamField path="AtIndex" type="TInteger" required>
+    The position where to insert the new item
+  </ParamField>
+  
+  <ParamField path="AMissing" type="Boolean" default="True">
+    Whether to mark the inserted value as missing
+  </ParamField>
+  
+  ```pascal
+  Data.Insert(10, False); // Insert at position 10
+  ```
+</ResponseField>
+
+<ResponseField name="Delete" type="procedure">
+  Deletes one or more rows starting at the specified position.
+  
+  <ParamField path="Row" type="TInteger" required>
+    Starting row index to delete
+  </ParamField>
+  
+  <ParamField path="ACount" type="TInteger" default="1">
+    Number of rows to delete
+  </ParamField>
+  
+  ```pascal
+  Data.Delete(5);      // Delete row 5
+  Data.Delete(10, 3);  // Delete rows 10, 11, 12
+  ```
+</ResponseField>
+
+<ResponseField name="Clear" type="procedure">
+  Removes all data and sub-items from this data item.
+  
+  ```pascal
+  Data.Clear;
+  ```
+</ResponseField>
+
+<ResponseField name="ClearData" type="procedure">
+  Removes all data values but keeps the structure.
+  
+  <ParamField path="Recursive" type="Boolean" default="False">
+    If True, also clears data from all sub-items
+  </ParamField>
+  
+  ```pascal
+  Data.ClearData(True); // Clear all data recursively
+  ```
+</ResponseField>
+
+### Sorting
+
+<ResponseField name="SortBy" type="procedure">
+  Sorts the data by the specified data item column.
+  
+  <ParamField path="AData" type="TDataItem" required>
+    The column to sort by
+  </ParamField>
+  
+  <ParamField path="Ascending" type="Boolean" default="True">
+    Sort direction (True = ascending, False = descending)
+  </ParamField>
+  
+  <ParamField path="IgnoreTextCase" type="Boolean" default="False">
+    For text columns, whether to ignore case when sorting
+  </ParamField>
+  
+  ```pascal
+  Table.SortBy(Table['Name'], True, True); // Sort by Name, case-insensitive
+  ```
+</ResponseField>
+
+### Data Access
+
+<ResponseField name="DataToString" type="function">
+  Converts the data value at the specified index to a string.
+  
+  <ParamField path="Index" type="TInteger" required>
+    The row index to convert
+  </ParamField>
+  
+  Returns the string representation of the value.
+  
+  ```pascal
+  S := Data.DataToString(0); // Get first value as string
+  ```
+</ResponseField>
+
+<ResponseField name="Compare" type="function">
+  Compares two data values at specified positions.
+  
+  <ParamField path="A" type="TInteger" required>
+    First row index
+  </ParamField>
+  
+  <ParamField path="B" type="TInteger" required>
+    Second row index
+  </ParamField>
+  
+  <ParamField path="IgnoreTextCase" type="Boolean" default="False">
+    For text data, whether to ignore case
+  </ParamField>
+  
+  Returns -1 if A < B, 0 if A = B, 1 if A > B.
+  
+  ```pascal
+  if Data.Compare(0, 1) < 0 then
+    ShowMessage('First value is smaller');
+  ```
+</ResponseField>
+
+<ResponseField name="CopyFrom" type="procedure">
+  Copies a value from a source data item.
+  
+  <ParamField path="DestIndex" type="TInteger" required>
+    Destination row index in this item
+  </ParamField>
+  
+  <ParamField path="Source" type="TDataItem" required>
+    Source data item to copy from
+  </ParamField>
+  
+  <ParamField path="SourceIndex" type="TInteger" required>
+    Source row index to copy
+  </ParamField>
+  
+  ```pascal
+  Data.CopyFrom(0, SourceData, 5); // Copy row 5 from source to row 0
+  ```
+</ResponseField>
+
+### Loading and Persistence
+
+<ResponseField name="Load" type="procedure">
+  Loads data from the associated Provider.
+  
+  <ParamField path="Children" type="Boolean">
+    Whether to also load child items
+  </ParamField>
+  
+  ```pascal
+  Data.Load(True); // Load this item and all children
+  ```
+</ResponseField>
+
+<ResponseField name="LoadFromFile" type="class function">
+  Loads a TDataItem from a file.
+  
+  <ParamField path="AFileName" type="String" required>
+    Path to the file to load
+  </ParamField>
+  
+  Returns the loaded TDataItem.
+  
+  ```pascal
+  Data := TDataItem.LoadFromFile('data.bi');
+  ```
+</ResponseField>
+
+<ResponseField name="SaveToFile" type="procedure">
+  Saves this TDataItem to a file.
+  
+  <ParamField path="AFileName" type="String" required>
+    Path where to save the file
+  </ParamField>
+  
+  ```pascal
+  Data.SaveToFile('output.bi');
+  ```
+</ResponseField>
+
+<ResponseField name="UnLoadData" type="procedure">
+  Frees memory by unloading data (can be reloaded later).
+  
+  <ParamField path="InvalidItems" type="Boolean" default="False">
+    Whether to invalidate the items structure
+  </ParamField>
+  
+  ```pascal
+  Data.UnLoadData; // Free memory, keep structure
+  ```
+</ResponseField>
+
+### Statistics and Analysis
+
+<ResponseField name="ReCalculate" type="procedure">
+  Recalculates all statistics for this item and optionally for all sub-items.
+  
+  <ParamField path="Parallel" type="Boolean" default="False">
+    Whether to use parallel threads for calculation
+  </ParamField>
+  
+  ```pascal
+  Data.ReCalculate(True); // Recalculate stats using threads
+  ```
+</ResponseField>
+
+<ResponseField name="TotalRows" type="function">
+  Returns the total number of rows (recursively for hierarchical data).
+  
+  ```pascal
+  Total := Data.TotalRows;
+  ```
+</ResponseField>
+
+<ResponseField name="TotalColumns" type="function">
+  Returns the total number of columns (recursively for hierarchical data).
+  
+  ```pascal
+  Total := Data.TotalColumns;
+  ```
+</ResponseField>
+
+<ResponseField name="FullName" type="function">
+  Returns the full hierarchical name including parent names.
+  
+  ```pascal
+  ShowMessage(Data.FullName); // e.g., "Customers Sales Amount"
+  ```
+</ResponseField>
+
+## Usage Examples
+
+### Creating and Populating a Simple Column
+
+```pascal
+var
+  Ages: TDataItem;
+  I: Integer;
+begin
+  // Create an integer column
+  Ages := TDataItem.Create(dkInt32, 'Age');
+  
+  // Resize to hold 5 values
+  Ages.Resize(5);
+  
+  // Fill with data
+  Ages.Int32Data[0] := 25;
+  Ages.Int32Data[1] := 30;
+  Ages.Int32Data[2] := 22;
+  Ages.Int32Data[3] := 35;
+  Ages.Int32Data[4] := 28;
+  
+  // Access statistics
+  ShowMessage('Average age: ' + FloatToStr(Ages.Stats.Mean));
+  ShowMessage('Minimum age: ' + IntToStr(TInt32Stats(Ages.Stats).Min));
+  
+  Ages.Free;
+end;
+```
+
+### Creating a Table Structure
+
+```pascal
+var
+  Customers: TDataItem;
+  Name, City: TDataItem;
+  Age: TDataItem;
+begin
+  // Create a table
+  Customers := TDataItem.Create(True);
+  Customers.Name := 'Customers';
+  
+  // Add columns
+  Name := TDataItem.Create(dkText, 'Name');
+  Age := TDataItem.Create(dkInt32, 'Age');
+  City := TDataItem.Create(dkText, 'City');
+  
+  Customers.Items.Add(Name);
+  Customers.Items.Add(Age);
+  Customers.Items.Add(City);
+  
+  // Add rows using Append
+  Customers.Append(['John Smith', 25, 'New York']);
+  Customers.Append(['Jane Doe', 30, 'Boston']);
+  Customers.Append(['Bob Wilson', 22, 'Chicago']);
+  
+  // Sort by name
+  Customers.SortBy(Name, True, True);
+  
+  ShowMessage('Total rows: ' + IntToStr(Customers.Count));
+  
+  Customers.Free;
+end;
+```
+
+### Working with Missing Data
+
+```pascal
+var
+  Sales: TDataItem;
+begin
+  Sales := TDataItem.Create(dkDouble, 'Sales');
+  Sales.Resize(5);
+  
+  // Set some values
+  Sales.DoubleData[0] := 1000.50;
+  Sales.DoubleData[1] := 1500.25;
+  Sales.Missing[2] := True;  // Mark row 2 as missing
+  Sales.DoubleData[3] := 2000.00;
+  Sales.Missing[4] := True;  // Mark row 4 as missing
+  
+  // Check for missing values
+  if Sales.Missing[2] then
+    ShowMessage('Row 2 has missing data');
+  
+  ShowMessage('Missing count: ' + IntToStr(Sales.Missing.MissingCount));
+  
+  // Statistics automatically handle missing values
+  ShowMessage('Average (excluding missing): ' + FloatToStr(Sales.Stats.Mean));
+  
+  Sales.Free;
+end;
+```
+
+### Saving and Loading Data
+
+```pascal
+var
+  Data, LoadedData: TDataItem;
+begin
+  // Create and populate data
+  Data := TDataItem.Create(dkInt32, 'Numbers');
+  Data.Resize(3);
+  Data.Int32Data[0] := 10;
+  Data.Int32Data[1] := 20;
+  Data.Int32Data[2] := 30;
+  
+  // Save to file
+  Data.SaveToFile('numbers.bi');
+  Data.Free;
+  
+  // Load from file
+  LoadedData := TDataItem.LoadFromFile('numbers.bi');
+  ShowMessage('Loaded ' + IntToStr(LoadedData.Count) + ' values');
+  
+  LoadedData.Free;
+end;
+```
+
+## See Also
+
+- [TDataKind](/api/tdatakind) - Data type enumeration
+- [TMissingData](/api/tmissingdata) - Missing data management
+- [TArrays](/api/tarrays) - Array helper types and methods

@@ -1,0 +1,92 @@
+---
+title: 'Queries & Summaries Overview'
+description: 'Introduction to SQL-like queries and data summarization in TeeBI'
+---
+
+TeeBI provides powerful SQL-like querying and data summarization capabilities that allow you to filter, group, aggregate, and transform data with high performance.
+
+## Key Features
+
+- **SQL Syntax Support**: Use familiar SQL-like syntax for data queries
+- **High-Speed Execution**: Optimized in-memory query processing
+- **Group By Operations**: Create summaries and aggregations by multiple dimensions
+- **Filtering**: Apply WHERE clauses with complex expressions
+- **Sorting**: ORDER BY with ascending/descending support
+- **Sub-Queries**: Nested SELECT statements for advanced filtering
+- **Distinct Values**: Eliminate duplicates from result sets
+- **Pagination**: TOP and OFFSET for result set limiting
+
+## Quick Example
+
+```pascal
+uses BI.SQL;
+
+var 
+  Data, Result: TDataItem;
+begin
+  // Simple aggregation with grouping
+  Result := TBISQL.From(Data, 
+    'sum(Amount) where (Customer=123) group by Country, Year');
+  
+  // Filter with sub-select
+  Result := TBISQL.From(Data, 
+    'ProductName, UnitPrice where UnitPrice > select Average(UnitPrice)');
+  
+  // Pagination
+  Result := TBISQL.From(Movies, 
+    'top 100 offset 15000 year, length');
+end;
+```
+
+## Core Classes
+
+### TBISQL
+The main class for parsing and executing SQL queries. See [BI.SQL.pas:81](/queries/sql-syntax#tbisql-class).
+
+**Key Methods**:
+- `From(AData, SQL)` - Parse and execute SQL query
+- `ProviderFrom(AData, SQL)` - Parse SQL and return provider
+
+### TBIQuery Component
+Component-based query builder that automatically determines whether to use SELECT or GROUP BY operations. See [BI.Query.pas:250](/queries/filtering#tbiquery-component).
+
+**Key Properties**:
+- `Dimensions` - Fields to select or group by
+- `Measures` - Aggregation calculations
+- `Filter` - WHERE clause filtering
+- `SortBy` - ORDER BY sorting
+
+### TSummary
+Class for creating grouped aggregations (similar to SQL GROUP BY). See [BI.Summary.pas:402](/queries/aggregations#tsummary-class).
+
+**Key Properties**:
+- `By` - Group by dimensions
+- `Measures` - Aggregate functions
+- `Filter` - Row-level filtering
+- `Having` - Post-aggregation filtering
+
+## Query Workflow
+
+1. **Parse** - SQL string is parsed into a provider (TDataSelect or TSummary)
+2. **Filter** - WHERE clause is evaluated for each row
+3. **Group** - Data is organized by GROUP BY dimensions
+4. **Aggregate** - Measures are calculated (SUM, AVG, COUNT, etc.)
+5. **Sort** - Results are ordered by ORDER BY clause
+6. **Limit** - TOP/OFFSET are applied to result set
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="SQL Syntax" icon="code" href="/queries/sql-syntax">
+    Learn the supported SQL syntax and features
+  </Card>
+  <Card title="Filtering" icon="filter" href="/queries/filtering">
+    Apply WHERE clauses and complex filters
+  </Card>
+  <Card title="Grouping" icon="layer-group" href="/queries/group-by">
+    Create multi-dimensional summaries
+  </Card>
+  <Card title="Aggregations" icon="calculator" href="/queries/aggregations">
+    Use SUM, COUNT, AVG, MIN, MAX functions
+  </Card>
+</CardGroup>

@@ -1,0 +1,507 @@
+---
+title: Arrays
+description: Array-based storage and high-performance operations in TeeBI
+---
+
+## Overview
+
+TeeBI's performance advantage comes from its array-based storage model. Instead of storing data in row objects, TeeBI uses strongly-typed dynamic arrays that enable direct memory access, parallel processing, and efficient statistical operations.
+
+<Note>
+All array types and helpers are defined in `BI.Arrays.pas`.
+</Note>
+
+## Array Types
+
+TeeBI provides specialized array types for each data kind:
+
+### Numeric Arrays
+
+```pascal
+TInt32Array = Array of Integer;      // 32-bit integers
+TInt64Array = Array of Int64;        // 64-bit integers
+TSingleArray = Array of Single;      // 32-bit floats
+TDoubleArray = Array of Double;      // 64-bit floats
+TExtendedArray = Array of Extended;  // Extended precision (x86)
+```
+
+### Other Arrays
+
+```pascal
+TTextArray = Array of String;        // Text/string data
+TDateTimeArray = Array of TDateTime; // Date and time values
+TBooleanArray = Array of Boolean;    // Boolean flags
+```
+
+### Native Platform Arrays
+
+```pascal
+// Automatically sized for platform (32-bit or 64-bit)
+TNativeIntArray = TInt64Array;  // on x64
+TNativeIntArray = TInt32Array;  // on x86
+```
+
+## Array Helper Methods
+
+Each array type has a record helper that provides extensive functionality:
+
+### Basic Operations
+
+<CodeGroup>
+```pascal Count and Resize
+var
+  Data: TInt32Array;
+begin
+  Data.Resize(100);  // Allocate 100 elements
+  ShowMessage('Count: ' + IntToStr(Data.Count));
+  
+  Data.Empty;  // Clear all elements
+end;
+```
+
+```pascal Append
+var
+  Data: TDoubleArray;
+begin
+  Data.Append(1.5);
+  Data.Append(2.5);
+  Data.Append(3.5);
+  // Data now contains [1.5, 2.5, 3.5]
+end;
+```
+
+```pascal Copy
+var
+  Source, Dest: TInt32Array;
+begin
+  Source.Resize(3);
+  Source[0] := 10;
+  Source[1] := 20;
+  Source[2] := 30;
+  
+  // Full copy
+  Dest := Source.Copy;
+  
+  // Partial copy (index, count)
+  Dest := Source.Copy(1, 2);  // [20, 30]
+end;
+```
+
+```pascal Insert and Delete
+var
+  Data: TInt32Array;
+begin
+  Data.Resize(3);
+  Data[0] := 10;
+  Data[1] := 30;
+  Data[2] := 40;
+  
+  // Insert 20 at index 1
+  Data.Insert(1, 20);  // [10, 20, 30, 40]
+  
+  // Delete 2 elements starting at index 1
+  Data.Delete(1, 2);   // [10, 40]
+end;
+```
+</CodeGroup>
+
+### Statistical Functions
+
+Arrays provide built-in statistical methods:
+
+```pascal
+var
+  Data: TDoubleArray;
+  Stats: TDoubleStats;
+begin
+  Data.Resize(5);
+  Data[0] := 10.0;
+  Data[1] := 20.0;
+  Data[2] := 30.0;
+  Data[3] := 40.0;
+  Data[4] := 50.0;
+  
+  // Calculate statistics
+  Stats := Data.Stats;
+  
+  ShowMessage(Format(
+    'Min: %f'#13 +
+    'Max: %f'#13 +
+    'Mean: %f'#13 +
+    'Median: %f'#13 +
+    'StdDev: %f',
+    [Stats.Min, Stats.Max, Stats.Mean, Stats.Median, Stats.StdDeviation]
+  ));
+  
+  Stats.Free;
+end;
+```
+
+### Individual Statistical Methods
+
+<Tabs>
+  <Tab title="Basic Stats">
+    ```pascal
+    var
+      Data: TInt32Array;
+    begin
+      Data := [10, 20, 30, 40, 50];
+      
+      ShowMessage('Min: ' + IntToStr(Data.Minimum));      // 10
+      ShowMessage('Max: ' + IntToStr(Data.Maximum));      // 50
+      ShowMessage('Mean: ' + FloatToStr(Data.Mean));      // 30.0
+      ShowMessage('Sum: ' + FloatToStr(Data.Sum));        // 150.0
+    end;
+    ```
+  </Tab>
+  
+  <Tab title="Advanced Stats">
+    ```pascal
+    var
+      Data: TDoubleArray;
+      Mean, StdDev, Variance: Double;
+    begin
+      Data := [10.0, 20.0, 30.0, 40.0, 50.0];
+      
+      Mean := Data.Mean;
+      Variance := Data.Variance(Mean);
+      StdDev := Data.StdDeviation(Mean);
+      
+      ShowMessage(Format('Variance: %f, StdDev: %f', [Variance, StdDev]));
+    end;
+    ```
+  </Tab>
+  
+  <Tab title="Correlation">
+    ```pascal
+    var
+      X, Y: TDoubleArray;
+      Correlation, Covariance: Double;
+      XMean, YMean: Double;
+    begin
+      X := [1.0, 2.0, 3.0, 4.0, 5.0];
+      Y := [2.0, 4.0, 5.0, 4.0, 5.0];
+      
+      XMean := X.Mean;
+      YMean := Y.Mean;
+      
+      Covariance := X.CoVariance(Y, XMean, YMean);
+      Correlation := X.Correlation(Y, XMean, YMean);
+      
+      ShowMessage(Format('Correlation: %f', [Correlation]));
+    end;
+    ```
+  </Tab>
+</Tabs>
+
+## Sorting Operations
+
+All array types support efficient sorting:
+
+<CodeGroup>
+```pascal Basic Sorting
+var
+  Data: TInt32Array;
+begin
+  Data := [50, 20, 40, 10, 30];
+  
+  Data.Sort;  // Ascending by default
+  // Result: [10, 20, 30, 40, 50]
+  
+  Data.Sort(False);  // Descending
+  // Result: [50, 40, 30, 20, 10]
+end;
+```
+
+```pascal Text Sorting
+var
+  Data: TTextArray;
+begin
+  Data := ['Charlie', 'alice', 'Bob'];
+  
+  // Case-sensitive sort
+  Data.Sort(True, False);
+  // Result: ['Bob', 'Charlie', 'alice']
+  
+  // Case-insensitive sort
+  Data.Sort(True, True);
+  // Result: ['alice', 'Bob', 'Charlie']
+end;
+```
+
+```pascal Partial Sorting
+var
+  Data: TInt32Array;
+begin
+  Data := [50, 20, 40, 10, 30];
+  
+  // Sort only elements 1-3
+  Data.Sort(1, 3, True);
+  // Result: [50, 10, 20, 40, 30]
+end;
+```
+</CodeGroup>
+
+### Custom Sorting with Callbacks
+
+You can sort one array while swapping corresponding elements in other arrays:
+
+```pascal
+type
+  TSwapProc = procedure(const A, B: TInteger) of object;
+
+var
+  Names: TTextArray;
+  Ages: TInt32Array;
+  
+procedure SwapAges(const A, B: Integer);
+var
+  Temp: Integer;
+begin
+  Temp := Ages[A];
+  Ages[A] := Ages[B];
+  Ages[B] := Temp;
+end;
+
+begin
+  Names := ['Charlie', 'Alice', 'Bob'];
+  Ages := [30, 25, 35];
+  
+  // Sort names, swap ages accordingly
+  Names.Sort(True, False, SwapAges);
+  // Names: ['Alice', 'Bob', 'Charlie']
+  // Ages:  [25, 35, 30]
+end;
+```
+
+## Searching Operations
+
+### Binary Search (Sorted Arrays)
+
+```pascal
+var
+  Data: TInt32Array;
+  Index: Integer;
+  Found: Boolean;
+begin
+  Data := [10, 20, 30, 40, 50];  // Must be sorted
+  
+  Index := Data.SortedFind(30, Found);
+  
+  if Found then
+    ShowMessage('Found at index: ' + IntToStr(Index))
+  else
+    ShowMessage('Would insert at index: ' + IntToStr(Index));
+end;
+```
+
+### Linear Search
+
+```pascal
+var
+  Data: TInt32Array;
+  Index: Integer;
+begin
+  Data := [50, 20, 40, 10, 30];
+  
+  Index := Data.IndexOf(40);
+  if Index >= 0 then
+    ShowMessage('Found at index: ' + IntToStr(Index));
+end;
+```
+
+## Data Maps
+
+TeeBI creates data maps for efficient lookup and statistics:
+
+```pascal
+var
+  Data: TInt32Array;
+  Map: TInt32Map;
+  Median, Mode: Integer;
+begin
+  Data := [10, 20, 20, 30, 30, 30, 40];
+  
+  // Create map with calculated median and mode
+  Map := Data.Map(Median, Mode);
+  try
+    ShowMessage('Median: ' + IntToStr(Median));  // 30
+    ShowMessage('Mode: ' + IntToStr(Mode));      // 30 (most frequent)
+    ShowMessage('Unique values: ' + IntToStr(Map.Count));
+  finally
+    Map.Free;
+  end;
+end;
+```
+
+Data maps provide:
+- **Unique value tracking**: Automatically identifies distinct values
+- **Fast lookup**: Binary search in sorted unique values
+- **Frequency counting**: Tracks how many times each value appears
+- **Median/Mode calculation**: Statistical measures
+
+## Performance Benefits
+
+### Direct Memory Access
+
+Arrays provide direct access without object allocation overhead:
+
+```pascal
+var
+  Data: TDoubleArray;
+  I: Integer;
+  Sum: Double;
+begin
+  Data.Resize(1000000);
+  
+  // Fast direct access
+  Sum := 0;
+  for I := 0 to Data.Count - 1 do
+    Sum := Sum + Data[I];
+end;
+```
+
+### Cache-Friendly Storage
+
+Column-oriented storage keeps related data contiguous in memory:
+
+```pascal
+// Good: Sequential access to a column (cache-friendly)
+for I := 0 to AgeColumn.Count - 1 do
+  Total := Total + AgeColumn.Int32Data[I];
+
+// Less efficient: Row-based access requiring multiple arrays
+for I := 0 to RowCount - 1 do
+  ProcessRow(Names[I], Ages[I], Addresses[I]);
+```
+
+### Parallel Processing
+
+Arrays support parallel operations (RAD Studio XE7+):
+
+```pascal
+uses
+  System.Threading;
+
+var
+  Data: TDoubleArray;
+  Results: TDoubleArray;
+begin
+  Data.Resize(10000);
+  Results.Resize(10000);
+  
+  // Parallel transformation
+  TParallel.For(0, Data.Count - 1, 
+    procedure(Index: Integer)
+    begin
+      Results[Index] := Sqrt(Data[Index]) * 2.0;
+    end
+  );
+end;
+```
+
+## Working with Missing Values
+
+Arrays can be copied while excluding missing values:
+
+```pascal
+var
+  Data: TDoubleArray;
+  Missing: TBooleanArray;
+  Clean: TDoubleArray;
+begin
+  Data := [10.0, 20.0, 30.0, 40.0];
+  Missing.Resize(4);
+  Missing[1] := True;  // Mark index 1 as missing
+  
+  // Copy excluding missing values
+  Clean := Data.Copy(Missing);
+  // Clean = [10.0, 30.0, 40.0]
+end;
+```
+
+## Array Utilities
+
+### Reverse
+
+```pascal
+var
+  Data: TInt32Array;
+begin
+  Data := [1, 2, 3, 4, 5];
+  Data.Reverse;
+  // Result: [5, 4, 3, 2, 1]
+end;
+```
+
+### Initialize
+
+```pascal
+var
+  Data: TDoubleArray;
+begin
+  Data.Resize(100);
+  Data.Initialize(0.0);  // Set all elements to 0.0
+end;
+```
+
+### Normalize
+
+```pascal
+var
+  Data: TDoubleArray;
+  Mean: Double;
+begin
+  Data := [10.0, 20.0, 30.0];
+  Mean := Data.Mean;  // 20.0
+  
+  Data.Normalize(Mean);
+  // Result: [-10.0, 0.0, 10.0]
+end;
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Pre-allocate Memory" icon="gauge-high">
+    Use `Resize` to allocate memory once instead of repeatedly calling `Append` when you know the final size.
+  </Card>
+
+  <Card title="Use Appropriate Types" icon="microchip">
+    Choose the smallest array type that fits your data to minimize memory usage and maximize cache efficiency.
+  </Card>
+
+  <Card title="Leverage Statistics" icon="chart-line">
+    Use built-in statistical methods instead of implementing your own - they're highly optimized.
+  </Card>
+
+  <Card title="Sort Before Search" icon="magnifying-glass">
+    Use `SortedFind` on sorted arrays for O(log n) search performance instead of O(n) linear search.
+  </Card>
+</CardGroup>
+
+## Performance Comparison
+
+| Operation | TeeBI Arrays | Traditional Objects |
+|-----------|--------------|--------------------|
+| Memory allocation | Single block | Multiple small allocations |
+| Cache performance | Excellent (sequential) | Poor (scattered) |
+| Access speed | Direct indexing | Pointer indirection |
+| Statistics | Built-in, optimized | Manual implementation |
+| Parallel processing | Easy to parallelize | Requires synchronization |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Data Items" icon="database" href="/core/data-items">
+    Learn how arrays are used in TDataItem
+  </Card>
+  
+  <Card title="Data Types" icon="code" href="/core/data-types">
+    Understand the type system behind arrays
+  </Card>
+  
+  <Card title="Relationships" icon="diagram-project" href="/core/relationships">
+    Explore linking data with master-detail relationships
+  </Card>
+</CardGroup>

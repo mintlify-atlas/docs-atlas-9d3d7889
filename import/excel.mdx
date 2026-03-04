@@ -1,0 +1,419 @@
+---
+title: Excel Import
+description: Import Microsoft Excel spreadsheets (.xls, .xlsx)
+---
+
+The `TBIExcel` class provides import and export capabilities for Microsoft Excel files, supporting both legacy (.xls) and modern (.xlsx) formats.
+
+## Quick Start
+
+```pascal
+uses BI.Excel, BI.DataItem;
+
+var
+  Data: TDataItem;
+  
+// Import Excel file
+Data := TBIExcel.FromFile('spreadsheet.xlsx');
+
+// Import specific sheet
+var
+  Excel: TBIExcel;
+Excel := TBIExcel.Create;
+try
+  Excel.WorkSheet := 'Sales Data';
+  DataArray := Excel.ImportFile('workbook.xlsx');
+finally
+  Excel.Free;
+end;
+```
+
+## Requirements
+
+Excel import requires Microsoft Excel to be installed on the system (Windows only).
+
+**Check if Excel is available:**
+
+```pascal
+if TBIExcelEngine.IsExcelInstalled then
+  Data := TBIExcel.FromFile(FileName)
+else
+  ShowMessage('Excel not installed');
+```
+
+## Key Methods
+
+### ImportFile
+
+Import an Excel workbook:
+
+```pascal
+function ImportFile(const FileName: String): TDataArray;
+```
+
+**Example:**
+```pascal
+var
+  Excel: TBIExcel;
+  DataArray: TDataArray;
+  I: Integer;
+  
+Excel := TBIExcel.Create;
+try
+  DataArray := Excel.ImportFile('workbook.xlsx');
+  
+  // Each worksheet becomes a TDataItem
+  for I := 0 to High(DataArray) do
+  begin
+    ShowMessage('Sheet: ' + DataArray[I].Name);
+    BIGrid1.Data := DataArray[I];
+  end;
+finally
+  Excel.Free;
+end;
+```
+
+### Import from Folder
+
+```pascal
+function Import(const Folder: String; Recursive: Boolean = False): TDataArray;
+```
+
+**Example:**
+```pascal
+Excel.IncludePattern := '*.xlsx';
+Excel.ExcludePattern := '~$*'; // Ignore temp files
+DataArray := Excel.Import('C:\\Spreadsheets', True);
+```
+
+## Configuration Options
+
+### WorkSheet
+
+Import specific worksheet by name:
+
+```pascal
+Excel.WorkSheet := 'Sales Data';
+DataArray := Excel.ImportFile('workbook.xlsx');
+```
+
+**Leave empty to import all sheets:**
+
+```pascal
+Excel.WorkSheet := ''; // Default - imports all
+```
+
+### Range
+
+Import specific cell range:
+
+```pascal
+Excel.Range := 'A1:D100';
+DataArray := Excel.ImportFile('data.xlsx');
+```
+
+**Leave empty to use entire used range:**
+
+```pascal
+Excel.Range := ''; // Default - auto-detect
+```
+
+### HeaderCount
+
+Number of header rows to parse:
+
+```pascal
+Excel.HeaderCount := 1; // Default - first row is headers
+Excel.HeaderCount := 2; // Skip first 2 rows
+Excel.HeaderCount := 0; // No headers
+```
+
+## Advanced Examples
+
+### Import Specific Sheet and Range
+
+```pascal
+var
+  Excel: TBIExcel;
+  Data: TDataItem;
+  
+Excel := TBIExcel.Create;
+try
+  Excel.WorkSheet := 'Q1 Sales';
+  Excel.Range := 'B5:F50';
+  Excel.HeaderCount := 1;
+  
+  DataArray := Excel.ImportFile('quarterly_report.xlsx');
+  Data := TBISource.FromData(DataArray);
+  
+  BIGrid1.Data := Data;
+finally
+  Excel.Free;
+end;
+```
+
+### Import with Progress
+
+```pascal
+Excel.OnProgress := procedure(Sender: TObject; 
+                              Percent: Integer; 
+                              var Cancel: Boolean)
+  begin
+    ProgressBar1.Position := Percent;
+    Application.ProcessMessages;
+    
+    if CancelButton.Tag = 1 then
+      Cancel := True;
+  end;
+  
+DataArray := Excel.ImportFile('large_workbook.xlsx');
+```
+
+### Import Multiple Workbooks
+
+```pascal
+var
+  Excel: TBIExcel;
+  AllData: TDataArray;
+  I: Integer;
+  Files: TStringList;
+  
+Files := TStringList.Create;
+Excel := TBIExcel.Create;
+try
+  Files.Add('January.xlsx');
+  Files.Add('February.xlsx');
+  Files.Add('March.xlsx');
+  
+  SetLength(AllData, 0);
+  
+  for I := 0 to Files.Count - 1 do
+  begin
+    DataArray := Excel.ImportFile(Files[I]);
+    // Combine arrays...
+  end;
+finally
+  Excel.Free;
+  Files.Free;
+end;
+```
+
+## DataDefinition Import
+
+```pascal
+uses BI.Persist;
+
+var
+  Def: TDataDefinition;
+  Excel: TBIExcel;
+  
+Def := TDataDefinition.Create;
+try
+  Def['ExcelHeaderCount'] := '1';
+  
+  Excel := TBIExcel.Create(Def);
+  try
+    Excel.WorkSheet := 'Data';
+    Excel.Range := 'A1:Z1000';
+    
+    DataArray := Excel.ImportFile('input.xlsx');
+  finally
+    Excel.Free;
+  end;
+finally
+  Def.Free;
+end;
+```
+
+## Export to Excel
+
+Use `TBIExcelExport` to save data to Excel format:
+
+```pascal
+uses BI.Excel;
+
+var
+  Export: TBIExcelExport;
+  
+Export := TBIExcelExport.Create;
+try
+  Export.Data := MyData;
+  Export.SaveToFile('output.xlsx');
+finally
+  Export.Free;
+end;
+```
+
+### Export Options
+
+```pascal
+// BinaryOnly is always True for Excel
+Export.BinaryOnly := True;
+```
+
+**Export creates:**
+- One worksheet per table in TDataItem
+- Headers in first row
+- Automatic column width
+- Data types preserved
+
+### Export with Custom Engine
+
+```pascal
+uses BI.Excel;
+
+// Set custom export engine
+TBIExcelExport.Engine := TBIExcelEngine;
+
+var
+  Export: TBIExcelExport;
+Export := TBIExcelExport.Create;
+try
+  Export.Data := ComplexData;
+  Export.SaveToFile('complex_output.xlsx');
+finally
+  Export.Free;
+end;
+```
+
+## File Format Support
+
+```pascal
+// Check if file extension is supported
+if TBIExcel.Supports('.xlsx') then
+  Data := TBIExcel.FromFile(FileName);
+  
+if TBIExcel.Supports('.xls') then
+  Data := TBIExcel.FromFile(LegacyFile);
+
+// Get file filter for dialogs
+OpenDialog1.Filter := TBIExcel.FileFilter.ToString;
+// Returns: 'Microsoft Excel files|*.xls;*.xlsx'
+```
+
+**Supported formats:**
+- `.xls` - Excel 97-2003
+- `.xlsx` - Excel 2007 and later
+
+## Common Patterns
+
+### Import from File Dialog
+
+```pascal
+if OpenDialog1.Execute then
+begin
+  if TBIExcel.Supports(ExtractFileExt(OpenDialog1.FileName)) then
+  begin
+    Data := TBIExcel.FromFile(OpenDialog1.FileName);
+    BIGrid1.Data := Data;
+  end;
+end;
+```
+
+### Handle Multiple Sheets
+
+```pascal
+var
+  DataArray: TDataArray;
+  I: Integer;
+  
+DataArray := Excel.ImportFile('workbook.xlsx');
+
+// Create tabs for each sheet
+for I := 0 to High(DataArray) do
+begin
+  TabSheet := TTabSheet.Create(PageControl1);
+  TabSheet.PageControl := PageControl1;
+  TabSheet.Caption := DataArray[I].Name;
+  
+  Grid := TBIGrid.Create(TabSheet);
+  Grid.Parent := TabSheet;
+  Grid.Align := alClient;
+  Grid.Data := DataArray[I];
+end;
+```
+
+### Import Named Range
+
+```pascal
+// If you have a named range in Excel
+Excel.Range := 'SalesData'; // Named range
+DataArray := Excel.ImportFile('workbook.xlsx');
+```
+
+## Performance Considerations
+
+1. **Large Files**: Excel import can be slow for files with 100,000+ rows
+
+2. **Memory**: Each worksheet is loaded into memory completely
+
+3. **COM Objects**: Excel is accessed via COM automation which adds overhead
+
+**Tips:**
+- Close other Excel instances before import
+- Use Range to limit imported cells
+- Consider converting large Excel files to CSV first
+
+```pascal
+// For better performance with large files:
+Excel.Range := 'A1:Z10000'; // Limit range
+```
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Excel not installed error">
+    Check if Excel is available before import:
+    ```pascal
+    if not TBIExcelEngine.IsExcelInstalled then
+    begin
+      ShowMessage('Microsoft Excel is required');
+      Exit;
+    end;
+    ```
+  </Accordion>
+  
+  <Accordion title="File locked by another process">
+    Close the Excel file before importing:
+    ```pascal
+    // Or open in read-only mode (automatic)
+    ```
+  </Accordion>
+  
+  <Accordion title="Wrong data types detected">
+    Excel import uses CSV parser internally. Check HeaderCount and delimiter:
+    ```pascal
+    Excel.HeaderCount := 1;
+    ```
+  </Accordion>
+  
+  <Accordion title="Import is very slow">
+    Limit the range or worksheet:
+    ```pascal
+    Excel.WorkSheet := 'Sheet1'; // Only one sheet
+    Excel.Range := 'A1:Z1000';   // Only needed range
+    ```
+  </Accordion>
+  
+  <Accordion title="Temporary files (~$) showing up">
+    Exclude them:
+    ```pascal
+    Excel.ExcludePattern := '~$*';
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Platform Support
+
+<Warning>
+  Excel import only works on **Windows** with Microsoft Excel installed. For cross-platform Excel support, consider:
+  - Converting to CSV first
+  - Using third-party Excel libraries
+  - Using XML-based Excel formats (SpreadsheetML)
+</Warning>
+
+## See Also
+
+- [Data Import Overview](/import/overview)
+- [CSV Import](/import/csv)
+- [Database Import](/import/databases)

@@ -1,0 +1,215 @@
+---
+title: Visualization Overview
+description: Automatic charts, grids, trees, and geographic visualizations
+---
+
+TeeBI automatically creates visualizations from your data using charts, grids, trees, and geographic maps.
+
+## Visualization Components
+
+TeeBI provides specialized visual components:
+
+| Component | Purpose | Source |
+|-----------|---------|--------|
+| **TBIChart** | Chart visualizations | `VCLBI.Chart.pas`, `FMXBI.Chart.pas` |
+| **TBIGrid** | Tabular data display | `VCLBI.Grid.pas`, `FMXBI.Grid.pas` |
+| **TBITree** | Hierarchical trees | `BI.Tree.pas` |
+| **Geographic** | World maps and statistics | `BI.Geographic.pas` |
+
+## Automatic Visualization
+
+TeeBI automatically selects the best visualization:
+
+```pascal
+uses
+  VCLBI.Chart, BI.DataItem;
+
+var
+  Chart: TBIChart;
+  Data: TDataItem;
+begin
+  Chart := TBIChart.Create(Owner);
+  Chart.Parent := Self;
+  
+  // TeeBI automatically chooses chart type
+  Chart.Data := Data;
+end;
+```
+
+See `VCLBI.Chart.pas:207-281` for `TBIChart` class.
+
+## Visualization Modes
+
+The `TBIChartMode` enum (`VCLBI.Chart.pas:114`) defines:
+
+```pascal
+type
+  TBIChartMode = (Automatic, XY, ThreeD, Financial, Geographic);
+```
+
+- **Automatic** - TeeBI selects best mode
+- **XY** - 2D charts (bar, line, pie, etc.)
+- **ThreeD** - 3D surface and grid charts
+- **Financial** - Candlestick/OHLC charts
+- **Geographic** - World maps with data overlay
+
+### Forcing a Mode
+
+```pascal
+Chart.Options.Mode := TBIChartMode.ThreeD;
+```
+
+## Data Assignment
+
+Multiple ways to assign data:
+
+### Direct Assignment
+
+```pascal
+Chart.Data := MyData;
+```
+
+### From Arrays
+
+```pascal
+var
+  Items: TDataArray;
+begin
+  SetLength(Items, 3);
+  Items[0] := Data['Sales'];
+  Items[1] := Data['Quantity'];
+  Items[2] := Data['Region'];
+  
+  Chart.Fill(Items);
+end;
+```
+
+See `VCLBI.Chart.pas:261-265` for `Fill` methods.
+
+### From Pivot Tables
+
+```pascal
+var
+  Summary: TSummary;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    Summary.AddGroupBy(Data['Region']);
+    Summary.AddMeasure(Data['Sales'], TAggregate.Sum);
+    
+    // Visualize pivot results
+    Chart.Fill(Summary);
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+See `VCLBI.Chart.pas:264` for `Fill(TSummary)` method.
+
+### From Histograms
+
+```pascal
+var
+  Histogram: THistogram;
+begin
+  Histogram := THistogram.Create;
+  try
+    Histogram.Active := True;
+    Histogram.NumBins := 10;
+    
+    Chart.Fill(Histogram, Data['Price']);
+  finally
+    Histogram.Free;
+  end;
+end;
+```
+
+See `VCLBI.Chart.pas:263` for `Fill(THistogram)` method.
+
+## Chart Options
+
+Configure visualization using `TBIChartOptions` (`VCLBI.Chart.pas:124-200`):
+
+```pascal
+var
+  Chart: TBIChart;
+begin
+  Chart := TBIChart.Create(Owner);
+  
+  with Chart.Options do
+  begin
+    Mode := TBIChartMode.XY;
+    Dimensions := TBIChartDimensions.View3D;
+    Legend := TBIChartLegend.Show;
+    Marks := TBIChartMarks.Hide;
+    SeriesDirection := TBISeriesDirection.Horizontal;
+  end;
+end;
+```
+
+### Options Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| **Mode** | TBIChartMode | Visualization type |
+| **Dimensions** | TBIChartDimensions | 2D/3D view |
+| **Direction** | TBIChartDirection | Rows/Columns |
+| **Legend** | TBIChartLegend | Show/Hide legend |
+| **Marks** | TBIChartMarks | Value labels |
+| **Stacked** | TBIChartStacked | Stacked series |
+
+See `VCLBI.Chart.pas:124-200` for all options.
+
+## Responsive Design
+
+TeeBI adapts visualizations to data:
+
+- **Few points** - Bar or column charts
+- **Many points** - Line or area charts
+- **Categories** - Pie or doughnut charts
+- **Time series** - Line charts with date axis
+- **Geographic text** - Automatic map display
+- **Multiple series** - Stacked or grouped charts
+
+See `VCLBI.Chart.pas:1038-1052` for mode detection.
+
+## Platform Support
+
+Both VCL and FireMonkey:
+
+```pascal
+// VCL
+uses VCLBI.Chart, VCLBI.Grid;
+
+// FireMonkey  
+uses FMXBI.Chart, FMXBI.Grid;
+```
+
+The API is identical across platforms.
+
+## Performance Tips
+
+<Tip>
+  - Use `Chart.Fill(TSummary)` for aggregated data
+  - For large datasets, aggregate first with pivot tables
+  - 3D mode has higher rendering overhead
+  - Geographic mode requires the Geo database
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Charts" icon="chart-column" href="/visualization/charts">
+    Configure TBIChart visualizations
+  </Card>
+  <Card title="Grids" icon="table" href="/visualization/grids">
+    Display data in TBIGrid
+  </Card>
+  <Card title="Trees" icon="diagram-project" href="/visualization/trees">
+    Hierarchical tree visualization
+  </Card>
+  <Card title="Geographic" icon="globe" href="/visualization/geographic">
+    World maps and statistics
+  </Card>
+</CardGroup>

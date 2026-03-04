@@ -1,0 +1,339 @@
+---
+title: 'Filtering Data'
+description: 'Apply WHERE clauses and filters to TeeBI queries'
+---
+
+TeeBI provides powerful filtering capabilities through WHERE clauses, expressions, and filter objects.
+
+## WHERE Clause
+
+Basic filtering syntax:
+
+```pascal
+Result := TBISQL.From(Data, 'ProductName, Price where Price > 50');
+```
+
+## Comparison Operators
+
+```pascal
+// Equal
+Result := TBISQL.From(Data, 'Name where Customer = 123');
+
+// Not equal
+Result := TBISQL.From(Data, 'Name where Status <> "Inactive"');
+
+// Greater than / Less than
+Result := TBISQL.From(Data, 'Name where Price > 100');
+Result := TBISQL.From(Data, 'Name where Quantity < 10');
+
+// Greater or equal / Less or equal
+Result := TBISQL.From(Data, 'Name where Price >= 100');
+Result := TBISQL.From(Data, 'Name where Quantity <= 10');
+```
+
+## Logical Operators
+
+### AND
+
+```pascal
+Result := TBISQL.From(Data, 
+  'ProductName where (Price > 50) and (Category = "Electronics")');
+  
+Result := TBISQL.From(Data,
+  'sum(Amount) where (Customer=123) and (Product<456) group by Country');
+```
+
+### OR
+
+```pascal
+Result := TBISQL.From(Data, 
+  'ProductName where (Category = "Electronics") or (Category = "Books")');
+```
+
+### NOT
+
+```pascal
+Result := TBISQL.From(Data, 
+  'ProductName where not (Price > 100)');
+```
+
+See [TLogicalExpression](/queries/expressions#logical-operators) at BI.Expression.pas:238.
+
+## IN Operator
+
+Test if value is in a list:
+
+```pascal
+// Static list
+Result := TBISQL.From(Data, 
+  'ProductName where Category in ["Electronics", "Books", "Toys"]');
+
+// Sub-query
+Result := TBISQL.From(Data, 
+  'ProductName where CategoryID in select ID from Categories where Active=true');
+```
+
+See [LeftInRight](/queries/filtering#in-operator) at BI.Expression.pas:769.
+
+## Text Operators
+
+### Starts With
+
+```pascal
+Result := TBISQL.From(Data, 
+  'ProductName where ProductName starts "Pro"');
+```
+
+### Ends With
+
+```pascal
+Result := TBISQL.From(Data, 
+  'ProductName where ProductName ends ".com"');
+```
+
+### Contains
+
+```pascal
+Result := TBISQL.From(Data, 
+  'ProductName where Description contains "premium"');
+```
+
+See [TTextLogicalExpression](/queries/expressions#text-operators) at BI.Expression.pas:532.
+
+## Sub-Queries in Filters
+
+Use sub-queries for dynamic filtering:
+
+```pascal
+// Compare to aggregate
+Result := TBISQL.From(Data, 
+  'ProductName, UnitPrice where UnitPrice > select Average(UnitPrice)');
+
+// Using IN with sub-query
+Result := TBISQL.From(Data,
+  'OrderID where CustomerID in select ID from Customers where Country="USA"');
+```
+
+Sub-queries are evaluated first and their results used in the outer query filter.
+
+## TBIQuery Component
+
+Component-based filtering with the TBIQuery class. See [BI.Query.pas:250](/queries/filtering#tbiquery-component).
+
+### Filter Property
+
+```pascal
+var
+  Query: TBIQuery;
+begin
+  Query := TBIQuery.Create(nil);
+  try
+    Query.Data := MyData;
+    
+    // Set filter as text
+    Query.Filter.Text := 'Price > 100';
+    
+    // Or use custom expression
+    Query.Filter.Custom := TLogicalExpression.Create(
+      TDataItemExpression.Create(MyData['Price']),
+      TLogicalOperand.Greater,
+      TIntegerExpression.Create(100)
+    );
+    
+    Result := Query.Calculate;
+  finally
+    Query.Free;
+  end;
+end;
+```
+
+## TDataSelect Filtering
+
+Direct filtering with TDataSelect. See [BI.DataSource.pas:379](/queries/filtering#tdataselect).
+
+```pascal
+var
+  Select: TDataSelect;
+begin
+  Select := TDataSelect.Create(nil);
+  try
+    Select.Data := MyData;
+    Select.Add(MyData['ProductName']);
+    Select.Add(MyData['Price']);
+    
+    // Set filter expression
+    Select.Filter := TLogicalExpression.Create(
+      TDataItemExpression.Create(MyData['Price']),
+      TLogicalOperand.Greater,
+      TIntegerExpression.Create(100)
+    );
+    
+    Result := Select.Calculate;
+  finally
+    Select.Free;
+  end;
+end;
+```
+
+## Filter Expressions
+
+Build complex filters programmatically:
+
+```pascal
+var
+  Filter1, Filter2, Combined: TLogicalExpression;
+begin
+  // Price > 100
+  Filter1 := TLogicalExpression.Create(
+    TDataItemExpression.Create(MyData['Price']),
+    TLogicalOperand.Greater,
+    TIntegerExpression.Create(100)
+  );
+  
+  // Category = "Electronics"
+  Filter2 := TLogicalExpression.Create(
+    TDataItemExpression.Create(MyData['Category']),
+    TLogicalOperand.Equal,
+    TTextExpression.Create('Electronics')
+  );
+  
+  // Combine with AND
+  Combined := TLogicalExpression.Join(Filter1, Filter2, TLogicalOperand.&And);
+  
+  Select.Filter := Combined;
+end;
+```
+
+See [TLogicalExpression.Join](/queries/expressions#combining-filters) at BI.Expression.pas:737.
+
+## Distinct Values
+
+Eliminate duplicate rows:
+
+```pascal
+// Using SQL
+Result := TBISQL.From(Data, 'distinct Country, City');
+
+// Using TDataSelect
+Select.Distinct := True;
+```
+
+See [TDataSelect.Distinct](/queries/filtering#distinct) at BI.DataSource.pas:381.
+
+## Pagination
+
+### Using TOP and OFFSET
+
+```pascal
+// First 100 rows
+Result := TBISQL.From(Data, 'top 100 ProductName, Price');
+
+// Skip 50, take 100
+Result := TBISQL.From(Data, 'top 100 offset 50 ProductName, Price');
+```
+
+### Using TDataSelect Properties
+
+```pascal
+Select.Max := 100;    // Maximum rows to return
+Select.Start := 50;   // Rows to skip
+```
+
+See [TDataSelect.Max](/queries/filtering#max) at BI.DataSource.pas:160 and Start at line 159.
+
+## Master-Detail Filtering
+
+Automatic filtering based on master-detail relationships:
+
+```pascal
+var
+  MasterData, DetailData: TDataItem;
+  DetailIndex: TCursorIndex;
+begin
+  // Get filtered detail records for master row 5
+  DetailIndex := TDataCursor.MasterDetailIndex(
+    DetailData,
+    TDataArray.Create([MasterData]),
+    5
+  );
+end;
+```
+
+See [TDataCursor.MasterDetailIndex](/queries/filtering#master-detail) at BI.DataSource.pas:142.
+
+## Filter Performance
+
+### UseFilter Property
+
+Control whether filters are applied:
+
+```pascal
+Select.UseFilter := False; // Temporarily disable filtering
+```
+
+See [TDataCursor.UseFilter](/queries/filtering#usefilter) at BI.DataSource.pas:161.
+
+### Filter Index Caching
+
+Filters create an index array for efficient access:
+
+```pascal
+var
+  Cursor: TDataCursor;
+begin
+  Cursor.Filter := MyFilterExpression;
+  Cursor.PrepareIndex; // Build index
+  
+  // Access filtered rows efficiently
+  for I := 0 to Cursor.Count - 1 do
+    Position := Cursor.Index[I];
+end;
+```
+
+See [TDataCursor.PrepareIndex](/queries/filtering#prepare-index) at BI.DataSource.pas:149.
+
+## HAVING Clause
+
+Filter after aggregation (used with GROUP BY):
+
+```pascal
+var
+  Summary: TSummary;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    Summary.Measures.Add(MyData['Sales'], TAggregate.Sum);
+    Summary.By.Add(MyData['Country']);
+    
+    // Filter aggregated results
+    Summary.Having.Add('Sum(Sales) > 10000');
+    
+    Result := Summary.Calculate;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+See [TSummary.Having](/queries/aggregations#having-clause) at BI.Summary.pas:467.
+
+## Error Handling
+
+Handle filter parsing errors:
+
+```pascal
+function FilterErrorHandler(
+  const APos: Integer;
+  const AMessage: String
+): Boolean;
+begin
+  ShowMessage(Format('Filter error at position %d: %s', [APos, AMessage]));
+  Result := True; // Don't raise exception
+end;
+
+Result := TBISQL.From(Data, 
+  'ProductName where invalid syntax', 
+  nil, 
+  FilterErrorHandler
+);
+```

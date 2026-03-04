@@ -1,0 +1,240 @@
+---
+title: Pivot Table Editor
+description: Visual drag-and-drop pivot table configuration
+---
+
+The pivot table editor provides a visual interface for configuring dimensions, measures, and filters.
+
+## Overview
+
+The editor allows you to:
+
+- Drag fields to Rows, Columns, or Values areas
+- Reorder dimensions by dragging
+- Configure aggregations and calculations
+- Apply filters visually
+- Remove fields by dragging out
+
+<Note>
+  The pivot editor is part of TeeBI's visual controls and requires VCL or FireMonkey.
+</Note>
+
+## Using the Editor
+
+### Design-Time Setup
+
+1. Drop a `TBISummary` component on a form
+2. Set the `Data` property to your data source
+3. Right-click and select "Pivot Editor"
+
+### Runtime Configuration
+
+```pascal
+uses
+  BI.Summary, BI.DataItem;
+
+var
+  Summary: TSummary;
+  Data: TDataItem;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    Summary.Data := Data;
+    
+    // Show editor dialog (requires VCL/FMX)
+    if EditSummary(Summary) then
+    begin
+      // User clicked OK
+      Result := Summary.Calculate;
+    end;
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+## Editor Areas
+
+### Fields List
+
+Shows all available fields from your data:
+
+- Drag fields to Rows, Columns, or Values
+- Search/filter the fields list
+- Shows field data types with icons
+
+### Rows Area
+
+Fields placed here create row groupings:
+
+- Multiple fields create hierarchies
+- Order determines grouping levels
+- Right-click for field options
+
+### Columns Area
+
+Fields placed here create column groupings:
+
+- Cross-tabulates with row fields
+- Multiple fields create nested columns
+- Drag to reorder
+
+### Values Area
+
+Fields placed here are aggregated:
+
+- Select aggregation type (Sum, Count, etc.)
+- Configure calculations (%, running totals)
+- Multiple measures show side-by-side
+
+## Field Configuration
+
+Right-click a field in any area:
+
+### For Dimensions (Rows/Columns)
+
+- **Sort Ascending/Descending** - Order values
+- **Date Grouping** - Group by Year, Quarter, Month, etc.
+- **Histogram** - Create numeric intervals
+- **Remove** - Remove from pivot table
+
+### For Measures (Values)
+
+- **Aggregation** - Change Sum, Count, Average, etc.
+- **Show as Percentage** - % of Total, Row, or Column
+- **Running Total** - Cumulative sum
+- **Difference** - Change from previous
+- **Missing Values** - Treat as zero
+
+## Filters
+
+Filter data before aggregation:
+
+```pascal
+var
+  Filter: TExpression;
+begin
+  // Create filter expression
+  Filter := Data['Year'] = 2024;
+  Summary.Filter := Filter;
+  
+  // Or use the editor's filter builder
+  // Click "Filter" button in editor toolbar
+end;
+```
+
+See `BI.Summary.pas:466` for the `Filter` property.
+
+## Having Clause
+
+Filter after aggregation using `TSummaryFilter` (`BI.Summary.pas:361-382`):
+
+```pascal
+var
+  Having: TSummaryFilter;
+begin
+  Having := Summary.Having;
+  
+  // Filter aggregated results
+  Having.Add('Sum(Sales) > 10000');
+end;
+```
+
+See `BI.Summary.pas:467` for the `Having` property.
+
+## Remove Missing
+
+Automatically remove empty rows/columns using `TRemoveMissing` (`BI.Summary.pas:384-396`):
+
+```pascal
+Summary.RemoveMissing.Rows := True;     // Hide empty rows
+Summary.RemoveMissing.Columns := True;  // Hide empty columns
+```
+
+## Sorting
+
+Order results using `SortBy`:
+
+```pascal
+var
+  SortItem: TSortItem;
+begin
+  // Sort by a dimension
+  SortItem := Summary.SortBy.Add(Data['Category']);
+  SortItem.Ascending := False;
+  
+  // Sort by aggregated value
+  SortItem := Summary.SortBy.Add(MeasureData);
+  SortItem.Ascending := False;
+end;
+```
+
+## Complete Editor Example
+
+```pascal
+uses
+  BI.Summary, BI.DataItem, BI.Expression;
+
+procedure ConfigurePivotTable;
+var
+  Summary: TSummary;
+  Data: TDataItem;
+  Measure: TMeasure;
+  GroupBy: TGroupBy;
+  Filter: TExpression;
+begin
+  Summary := TSummary.Create(nil);
+  try
+    Summary.Data := LoadSalesData;
+    
+    // Configure dimensions
+    GroupBy := Summary.AddGroupBy(Data['Region']);
+    GroupBy.Layout := TGroupByLayout.Rows;
+    
+    GroupBy := Summary.AddGroupBy(Data['Year']);
+    GroupBy.Layout := TGroupByLayout.Items;
+    
+    // Configure measures
+    Measure := Summary.AddMeasure(Data['Sales'], TAggregate.Sum);
+    Measure.Calculation.Percentage := TCalculationPercentage.Total;
+    
+    // Apply filter
+    Filter := Data['Year'] >= 2020;
+    Summary.Filter := Filter;
+    
+    // Remove empty rows/columns
+    Summary.RemoveMissing.Rows := True;
+    Summary.RemoveMissing.Columns := True;
+    
+    // Sort by total sales descending
+    Summary.SortBy.Add(Measure.DestData).Ascending := False;
+    
+    // Show editor for user customization
+    if EditSummary(Summary) then
+      DisplayPivotTable(Summary.Calculate);
+  finally
+    Summary.Free;
+  end;
+end;
+```
+
+## Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| **Delete** | Remove selected field |
+| **F2** | Rename field |
+| **Ctrl+Z** | Undo last change |
+| **Ctrl+Y** | Redo change |
+| **Ctrl+F** | Find field |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Overview" icon="table" href="/pivot/overview">
+    Learn pivot table basics
+  </Card>
+  <Card title="Visualization" icon="chart-line" href="/visualization/overview">
+    Display pivot results in charts
+  </Card>
+</CardGroup>

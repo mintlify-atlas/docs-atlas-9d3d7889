@@ -1,0 +1,295 @@
+---
+title: Data Items
+description: Understanding TDataItem, the core column-based data structure in TeeBI
+---
+
+## Overview
+
+TDataItem is the fundamental class in TeeBI that represents a column of data. Unlike traditional row-based table structures, TeeBI uses a column-oriented architecture where each TDataItem can own sub-columns, enabling you to build complex in-memory structures of tables and trees.
+
+<Note>
+TDataItem is defined in `BI.DataItem.pas` and serves as the foundation for all data operations in TeeBI.
+</Note>
+
+## Column-Based Storage
+
+TeeBI stores data in columns rather than rows. Each TDataItem represents a single column with a specific data type, and multiple TDataItem instances can be combined to form table structures.
+
+### Key Characteristics
+
+- **Column-oriented**: Data is stored vertically by column, not horizontally by row
+- **Type-specific arrays**: Each data type has its own optimized array storage
+- **Hierarchical structure**: TDataItem can contain child items (sub-columns)
+- **Memory efficient**: Direct array access without boxing/unboxing overhead
+
+## Creating Data Items
+
+You can create TDataItem instances in several ways:
+
+### Basic Construction
+
+```pascal
+var
+  Item: TDataItem;
+begin
+  // Create an empty data item
+  Item := TDataItem.Create;
+  
+  // Create with a specific data kind
+  Item := TDataItem.Create(dkInt32);
+  
+  // Create with kind and name
+  Item := TDataItem.Create(dkText, 'CustomerName');
+  
+  // Create as a table container
+  Item := TDataItem.Create(True); // AsTable = True
+end;
+```
+
+### Data Kinds
+
+Every TDataItem has a `Kind` property that determines its data type:
+
+```pascal
+TDataKind = (dkInt32, dkInt64, dkSingle, dkDouble, dkExtended, 
+             dkText, dkDateTime, dkBoolean, dkUnknown);
+```
+
+<Warning>
+The `Kind` property is read-only after creation. You cannot change a TDataItem's data type once it's been set.
+</Warning>
+
+## Data Storage Arrays
+
+Each TDataItem contains type-specific arrays for storing values:
+
+```pascal
+property Int32Data: TInt32Array;
+property Int64Data: TInt64Array;
+property SingleData: TSingleArray;
+property DoubleData: TDoubleArray;
+property ExtendedData: TExtendedArray;
+property TextData: TTextArray;
+property DateTimeData: TDateTimeArray;
+property BooleanData: TBooleanArray;
+```
+
+### Accessing Data
+
+```pascal
+var
+  Item: TDataItem;
+begin
+  Item := TDataItem.Create(dkInt32, 'Age');
+  Item.Resize(3);
+  
+  // Direct array access
+  Item.Int32Data[0] := 25;
+  Item.Int32Data[1] := 30;
+  Item.Int32Data[2] := 35;
+  
+  // Get count
+  ShowMessage('Rows: ' + IntToStr(Item.Count));
+end;
+```
+
+## Managing Data
+
+### Adding Rows
+
+Use the `Append` method to add new rows:
+
+```pascal
+var
+  Table: TDataItem;
+  Age, Name: TDataItem;
+begin
+  Table := TDataItem.Create(True); // Table mode
+  
+  Age := Table.Items.Add('Age', dkInt32);
+  Name := Table.Items.Add('Name', dkText);
+  
+  // Append a row with values for all columns
+  Table.Append([25, 'John']);
+  Table.Append([30, 'Jane']);
+end;
+```
+
+### Resizing
+
+Change the number of rows with `Resize`:
+
+```pascal
+Item.Resize(100); // Set to 100 rows
+```
+
+### Inserting and Deleting
+
+```pascal
+// Insert a row at index 5
+Item.Insert(5, True); // True = missing value
+
+// Delete a single row
+Item.Delete(3);
+
+// Delete multiple rows
+Item.Delete(10, 5); // Delete 5 rows starting at index 10
+```
+
+## Working with Sub-Items
+
+TDataItem can contain child items through the `Items` property:
+
+```pascal
+var
+  Table: TDataItem;
+  Column: TDataItem;
+begin
+  Table := TDataItem.Create(True);
+  
+  // Add columns to the table
+  Column := Table.Items.Add('FirstName', dkText);
+  Column := Table.Items.Add('LastName', dkText);
+  Column := Table.Items.Add('Age', dkInt32);
+  
+  // Access by index
+  ShowMessage(Table.Items[0].Name);
+  
+  // Access by name
+  ShowMessage(Table['Age'].Name);
+  
+  // Iterate through items
+  for Column in Table.Items do
+    ShowMessage(Column.Name);
+end;
+```
+
+## Properties and Methods
+
+### Key Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Count` | TInteger | Number of rows (read-only) |
+| `Kind` | TDataKind | Data type (read-only) |
+| `Name` | String | Column name |
+| `Parent` | TDataItem | Parent data item |
+| `Items` | TDataItems | Child items collection |
+| `AsTable` | Boolean | True when item represents a table |
+| `Missing` | TMissingData | Null/missing value tracking |
+| `Stats` | TDataStats | Statistical information |
+
+### Essential Methods
+
+<AccordionGroup>
+  <Accordion title="Append">
+    Add a new row with values:
+    ```pascal
+    function Append(const Values: Array of Variant): Integer;
+    ```
+  </Accordion>
+
+  <Accordion title="Resize">
+    Change the number of rows:
+    ```pascal
+    procedure Resize(const Size: TInteger);
+    ```
+  </Accordion>
+
+  <Accordion title="Insert">
+    Insert a row at a specific position:
+    ```pascal
+    procedure Insert(const AtIndex: TInteger; const AMissing: Boolean = True);
+    ```
+  </Accordion>
+
+  <Accordion title="Delete">
+    Remove rows:
+    ```pascal
+    procedure Delete(const Row: TInteger; const ACount: TInteger = 1);
+    ```
+  </Accordion>
+
+  <Accordion title="Clear">
+    Remove all data and reset the item:
+    ```pascal
+    procedure Clear;
+    ```
+  </Accordion>
+
+  <Accordion title="SortBy">
+    Sort rows by a column:
+    ```pascal
+    procedure SortBy(const AData: TDataItem; const Ascending: Boolean = True);
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Missing Values
+
+TeeBI tracks null/missing values separately from the data arrays:
+
+```pascal
+var
+  Item: TDataItem;
+begin
+  Item := TDataItem.Create(dkInt32);
+  Item.Resize(3);
+  
+  Item.Int32Data[0] := 100;
+  Item.Missing[1] := True; // Mark row 1 as missing
+  Item.Int32Data[2] := 200;
+  
+  // Check if value is missing
+  if Item.Missing[1] then
+    ShowMessage('Value is missing');
+end;
+```
+
+## Persistence
+
+Save and load TDataItem to/from disk:
+
+```pascal
+// Save to file
+Item.SaveToFile('data.tee');
+
+// Load from file
+Item := TDataItem.LoadFromFile('data.tee');
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Appropriate Types" icon="hashtag">
+    Choose the smallest data type that fits your needs (e.g., dkInt32 instead of dkInt64 when possible) to minimize memory usage.
+  </Card>
+
+  <Card title="Resize Once" icon="arrows-maximize">
+    When you know the final size, call `Resize` once instead of repeatedly calling `Append` for better performance.
+  </Card>
+
+  <Card title="Table Mode" icon="table">
+    Set `AsTable := True` when creating multi-column structures to enable proper recursive operations.
+  </Card>
+
+  <Card title="Check Missing Values" icon="circle-exclamation">
+    Always check the `Missing` property before using data values to avoid working with null data.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Data Types" icon="code" href="/core/data-types">
+    Learn about TDataKind enumeration and type handling
+  </Card>
+  
+  <Card title="Arrays" icon="list" href="/core/arrays">
+    Explore array-based storage and performance
+  </Card>
+  
+  <Card title="Relationships" icon="diagram-project" href="/core/relationships">
+    Understand master-detail relationships
+  </Card>
+</CardGroup>

@@ -1,0 +1,326 @@
+---
+title: Web Server
+description: Enable remote data access with TeeBI's transparent web server
+---
+
+## Overview
+
+TeeBI includes an optional **transparent remote web server** for fast data access. The server can serve compressed binary streams of raw array data over HTTP, enabling:
+
+- Remote data access from client applications
+- Centralized data management
+- Reduced client-side data processing
+- Automatic compression for network efficiency
+
+## Architecture
+
+The web server architecture consists of:
+
+- **Server**: Hosts TDataItem datasets and responds to HTTP requests
+- **Client**: `TBIWebClient` class for accessing remote data
+- **Protocol**: HTTP-based with query string parameters
+- **Compression**: Optional ZIP compression of binary data streams
+
+## Server Setup
+
+See the [Web Server demo](https://github.com/Steema/BI/tree/master/demos/online/remote_web) for a complete server implementation.
+
+### Basic Server Configuration
+
+The server listens on port 15015 by default (configurable):
+
+```pascal
+const
+  TBIWebClient.DefaultPort = 15015;
+```
+
+## Client Usage
+
+### Creating a Web Client
+
+```pascal
+uses BI.Web;
+
+var
+  Client: TBIWebClient;
+  Data: TDataItem;
+begin
+  // Connect to server
+  Client := TBIWebClient.Create('myserver.com', 15015);
+  try
+    // Enable compression (recommended)
+    Client.Compress := TWebCompression.Yes;
+    
+    // Load data
+    Data := Client.Load('Customers', TWebCompression.Yes);
+    
+    // Use data...
+  finally
+    Client.Free;
+  end;
+end;
+```
+
+### Quick Load from URL
+
+```pascal
+uses BI.Web;
+
+var Data: TDataItem;
+begin
+  // Load directly from URL
+  Data := TBIWebClient.FromURL(
+    'http://myserver.com:15015',
+    15015,
+    'data=Customers',
+    TWebCompression.Yes
+  );
+end;
+```
+
+### Load from Full URL
+
+```pascal
+var Data: TDataItem;
+begin
+  // Parse and load from complete URL
+  Data := TBIWebClient.FromURL(
+    'http://myserver.com:15015?data=Customers',
+    TWebCompression.Yes
+  );
+end;
+```
+
+## Compression
+
+The web server supports transparent compression of data streams.
+
+### Enable Compression
+
+```pascal
+Client.Compress := TWebCompression.Yes;  // Enable
+Client.Compress := TWebCompression.No;   // Disable
+```
+
+### Compression Benefits
+
+- **Bandwidth Reduction**: Typically 70-90% size reduction
+- **Faster Transfer**: Less data to transmit over network
+- **CPU Trade-off**: Uses CPU for compression/decompression
+
+### Compression Implementation
+
+From `BI.Web.pas:386-390`:
+
+```pascal
+class function TBIWebClient.UnZip(const AStream: TStream): TStream;
+begin
+  result := TCompression.DeCompress(AStream, 'data');
+  AStream.Free;
+end;
+```
+
+See [Compression](/advanced/compression) for details on compression options.
+
+## Query Parameters
+
+The web server accepts various query string parameters:
+
+### data
+
+Specify which dataset to retrieve:
+
+```
+http://server:15015?data=Customers
+```
+
+### children
+
+Include child/related data items:
+
+```
+http://server:15015?data=Orders&children=1
+```
+
+### zip
+
+Enable compression:
+
+```
+http://server:15015?data=Products&zip=1
+```
+
+### meta
+
+Retrieve only metadata (no data rows):
+
+```
+http://server:15015?data=Employees&meta=1
+```
+
+### sql
+
+Execute server-side query:
+
+```pascal
+var Result: TDataItem;
+Result := TBIWebClient.Query(
+  'MyStore',
+  'Orders',
+  'sum(Amount) where Year=2024 group by Customer'
+);
+```
+
+### format
+
+Output format (for browser viewing):
+
+```
+http://server:15015?data=Products&format=.jpg
+```
+
+## Advanced Features
+
+### Proxy Support
+
+```pascal
+Client.Proxy.Host := 'proxy.company.com';
+Client.Proxy.Port := 8080;
+Client.Proxy.User := 'username';
+Client.Proxy.Password := 'password';
+```
+
+### Timeout Configuration
+
+```pascal
+Client.Timeout := 5000;  // 5 seconds
+```
+
+### Progress Events
+
+```pascal
+TBIHttp.OnProgress := procedure(Sender: TObject; 
+                                 const ACurrent, ATotal: Int64;
+                                 var Abort: Boolean)
+begin
+  ProgressBar1.Max := ATotal;
+  ProgressBar1.Position := ACurrent;
+  Application.ProcessMessages;
+  
+  // User can cancel
+  if UserClickedCancel then
+    Abort := True;
+end;
+```
+
+## Delayed Loading
+
+Load data on-demand using delay providers:
+
+```pascal
+var 
+  Data: TDataItem;
+  Provider: TDelayHandlerWeb;
+begin
+  // Create client
+  var Client := TBIWebClient.Create('server.com', 15015);
+  
+  // Get metadata only
+  Data := Client.GetMetaData('LargeDataset', TWebCompression.Yes);
+  
+  // Set up delayed loading
+  Provider := TDelayHandlerWeb.CreateWeb(Client);
+  Data.Provider := Provider;
+  
+  // Data loads on-demand when accessed
+  // Only accessed portions stay in memory
+end;
+```
+
+## Server-Side Processing
+
+Perform queries and aggregations on the server to reduce data transfer:
+
+```pascal
+// Server does the heavy lifting
+var Summary: TDataItem;
+Summary := TBIWebClient.Query(
+  'MainStore',
+  'Transactions',
+  'sum(Amount), avg(Amount), count(*) group by Year, Country'
+);
+
+// Client receives only aggregated results
+```
+
+## Online Demo
+
+Try the live web server:
+
+[http://steema.cat:15015/?data=SQLite_demo&format=.jpg](http://steema.cat:15015/?data=SQLite_demo|%22Order%20Details%22&format=.jpg&summary=sum(Quantity);Shippers.ShipperID)
+
+## Version Information
+
+From `BI.Web.pas:163-175`:
+
+```pascal
+TBIWebServer = class
+public
+  type
+    TVersion = record
+    public
+      Major, Minor: Integer;
+      URL: String;
+      function ToString: String;
+    end;
+  
+  const
+    Version: TVersion = (Major:1; Minor:0; URL:'');
+end;
+```
+
+## Best Practices
+
+1. **Enable Compression**: Always use compression for network efficiency
+2. **Server-Side Queries**: Aggregate data on server before transferring
+3. **Metadata First**: Load metadata, then data on-demand if needed
+4. **Connection Pooling**: Reuse TBIWebClient instances when possible
+5. **Error Handling**: Wrap web calls in try/except for network failures
+6. **Timeout Management**: Set appropriate timeouts for your network
+7. **Secure Connections**: Consider HTTPS in production (requires web server configuration)
+
+## Error Handling
+
+```pascal
+uses BI.Web;
+
+var
+  Client: TBIWebClient;
+  Data: TDataItem;
+begin
+  Client := TBIWebClient.Create('server.com', 15015);
+  try
+    Client.Timeout := 10000;  // 10 seconds
+    
+    try
+      Data := Client.Load('Customers', TWebCompression.Yes);
+    except
+      on E: EHttpAbort do
+        ShowMessage('User cancelled download');
+      on E: EBIException do
+        ShowMessage('TeeBI error: ' + E.Message);
+      on E: Exception do
+        ShowMessage('Network error: ' + E.Message);
+    end;
+  finally
+    Client.Free;
+  end;
+end;
+```
+
+## Related Topics
+
+- [Compression](/advanced/compression)
+- [Big Data Support](/advanced/big-data)
+- [Importing Data](/import/overview)
+- [Performance Optimization](/advanced/performance)

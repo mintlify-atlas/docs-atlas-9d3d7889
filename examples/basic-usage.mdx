@@ -1,0 +1,109 @@
+---
+title: Basic Usage
+description: Get started with TeeBI - import data, create queries, and visualize results
+---
+
+This example demonstrates the fundamental TeeBI workflow: importing data, running a query, and displaying results in a grid and chart.
+
+## Complete Example
+
+```pascal
+uses
+  BI.DataItem, BI.CSV, BI.Query,
+  VCLBI.Grid, VCLBI.Chart;
+
+type
+  TMainForm = class(TForm)
+    BIGrid1: TBIGrid;
+    BIChart1: TBIChart;
+    BIQuery1: TBIQuery;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+  private
+    Data1, Data2: TDataItem;
+    procedure RefreshQuery;
+  end;
+
+procedure TMainForm.FormCreate(Sender: TObject);
+begin
+  // Load CSV data
+  Data1 := TBICSV.FromFile('products.csv');
+
+  // Parse a summary query
+  BIQuery1.Parse(Data1, 'Sum(Stock) group by Category, Color');
+
+  // Execute query and show results
+  RefreshQuery;
+
+  // Configure chart appearance
+  BIChart1.Chart.View3D := False;
+  BIChart1.Chart.Axes.Bottom.Texts.Angle := 90;
+end;
+
+procedure TMainForm.RefreshQuery;
+begin
+  Data2.Free;
+  Data2 := BIQuery1.Calculate;  // Run the query
+
+  BIGrid1.Data := Data2;   // Show results in grid
+  BIChart1.Data := Data2;  // Show results in chart
+end;
+
+procedure TMainForm.FormDestroy(Sender: TObject);
+begin
+  Data2.Free;
+  Data1.Free;
+end;
+```
+
+## What This Code Does
+
+1. **Imports CSV data** - Loads a CSV file into memory using `TBICSV.FromFile`
+2. **Creates a query** - Parses a SQL-like query string to sum stock by category and color
+3. **Executes the query** - Runs `Calculate` to generate aggregated results
+4. **Visualizes results** - Displays data in both a grid and chart automatically
+
+## Expected Output
+
+The grid will show:
+- Category column (e.g., Electronics, Clothing)
+- Color column (e.g., Red, Blue)
+- Sum(Stock) column with aggregated values
+
+The chart will visualize the same data with automatic series creation.
+
+## Key Concepts
+
+- **TDataItem** - Core class representing a table or dataset
+- **BIQuery** - Component for creating and executing queries
+- **BIGrid/BIChart** - Visual components that bind to TDataItem
+- **Memory management** - Always free TDataItem objects in FormDestroy
+
+## Interactive Editors
+
+TeeBI includes visual editors for runtime customization:
+
+```pascal
+procedure TMainForm.EditGridClick(Sender: TObject);
+begin
+  TBIGridEditor.Edit(Self, BIGrid1);  // Show grid editor
+end;
+
+procedure TMainForm.EditChartClick(Sender: TObject);
+begin
+  TBIChartEditor.Edit(Self, BIChart1);  // Show chart editor
+end;
+
+procedure TMainForm.EditQueryClick(Sender: TObject);
+begin
+  if TBIQueryEditor.Edit(Self, BIQuery1) then  // Show query editor
+    RefreshQuery;
+end;
+```
+
+## See Also
+
+- [Importing Data](/examples/importing-data) - Learn about all import formats
+- [Simple Queries](/examples/simple-queries) - More query examples
+- [Charts](/examples/charts) - Advanced chart customization
+- [Grids](/examples/grids) - Grid features and options

@@ -1,0 +1,269 @@
+---
+title: 'SQL Syntax'
+description: 'Supported SQL syntax and query features in TeeBI'
+---
+
+TeeBI implements a SQL-like syntax for querying and summarizing data. The parser supports most common SQL features with some TeeBI-specific enhancements.
+
+## Basic SELECT Syntax
+
+```pascal
+Result := TBISQL.From(Data, 'ProductName, UnitPrice');
+```
+
+This creates a TDataSelect with the specified columns.
+
+## SELECT with WHERE
+
+```pascal
+Result := TBISQL.From(Data, 
+  'ProductName, UnitPrice where UnitPrice > 50');
+```
+
+## SELECT DISTINCT
+
+Eliminate duplicate rows from results:
+
+```pascal
+Result := TBISQL.From(Data, 'distinct Country, City');
+```
+
+See [TDataSelect.Distinct](/queries/filtering#distinct-values) at BI.DataSource.pas:381.
+
+## GROUP BY Queries
+
+```pascal
+// Simple aggregation
+Result := TBISQL.From(Data, 'sum(Amount) group by Country');
+
+// Multiple dimensions
+Result := TBISQL.From(Data, 
+  'sum(Amount), count(*) group by Country, Year');
+
+// With filtering
+Result := TBISQL.From(Data, 
+  'sum(Amount) where Customer=123 group by Country, Year');
+```
+
+See [GROUP BY Details](/queries/group-by) for more information.
+
+## ORDER BY Sorting
+
+```pascal
+// Ascending (default)
+Result := TBISQL.From(Data, 'ProductName, Price order by Price');
+
+// Descending
+Result := TBISQL.From(Data, 
+  'ProductName, Price order by Price desc');
+
+// Multiple columns
+Result := TBISQL.From(Data, 
+  'ProductName, Price order by Category, Price desc');
+```
+
+The parser also accepts `sort by` as an alias for `order by`.
+
+See [BI.SQL.pas:70](/queries/sorting#parse-sort) for implementation.
+
+## TOP and OFFSET
+
+### Pagination
+
+```pascal
+// First 100 rows
+Result := TBISQL.From(Data, 'top 100 ProductName, Price');
+
+// Skip first 15000, then take 100
+Result := TBISQL.From(Movies, 'top 100 offset 15000 year, length');
+```
+
+See [TDataSelect.Max](/queries/filtering#pagination) at BI.DataSource.pas:160 and Start property at line 159.
+
+## Sub-Queries
+
+TeeBI supports sub-queries in WHERE clauses:
+
+```pascal
+// Filter using sub-query result
+Result := TBISQL.From(Data, 
+  'ProductName, UnitPrice where UnitPrice > select Average(UnitPrice)');
+
+// Using sub-query with IN operator
+Result := TBISQL.From(Data, 
+  'ProductName where Category in select CategoryID where Active=true');
+```
+
+Sub-queries are parsed recursively. See [TSQLParser.Parse](/queries/expressions#sub-queries) at BI.SQL.pas:1139.
+
+## Aggregate Functions
+
+Supported aggregation functions:
+
+- `count(*)` - Count rows
+- `count(Field)` - Count non-null values
+- `sum(Field)` - Sum values
+- `average(Field)` - Average values
+- `min(Field)` - Minimum value
+- `max(Field)` - Maximum value
+- `first(Field)` - First value
+- `last(Field)` - Last value
+
+```pascal
+Result := TBISQL.From(Data, 
+  'count(*), sum(Amount), average(Price) group by Country');
+```
+
+See [TAggregate](/queries/aggregations#aggregate-functions) at BI.Summary.pas:106.
+
+## Date/Time Parts
+
+Group by date/time parts:
+
+```pascal
+// Group by year
+Result := TBISQL.From(Data, 'sum(Sales) group by Year(OrderDate)');
+
+// Group by month
+Result := TBISQL.From(Data, 'sum(Sales) group by Month(OrderDate)');
+
+// Group by quarter
+Result := TBISQL.From(Data, 'sum(Sales) group by Quarter(OrderDate)');
+```
+
+Supported date/time parts:
+- `Year`, `Month`, `Day`, `Quarter`, `Week`
+- `Hour`, `Minute`, `Second`
+- `WeekDay`, `DayOfYear`
+
+See [TDateTimePart](/queries/group-by#datetime-grouping) at BI.Expression.pas:401.
+
+## Expressions in Queries
+
+Use expressions in SELECT, WHERE, and GROUP BY:
+
+```pascal
+// Calculated fields
+Result := TBISQL.From(Data, 'Price * Quantity as Total');
+
+// Expressions in WHERE
+Result := TBISQL.From(Data, 
+  'ProductName where Price * Quantity > 1000');
+
+// String functions
+Result := TBISQL.From(Data, 
+  'Upper(ProductName), Length(Description)');
+```
+
+See [Expressions Guide](/queries/expressions) for details.
+
+## TBISQL Class
+
+The main SQL parser and executor class. See [BI.SQL.pas:81](/queries/sql-syntax#tbisql-record).
+
+### From Methods
+
+```pascal
+class function From(
+  const AData: TDataItem; 
+  const SQL: String;
+  const GetData: TGetDataProc = nil;
+  const ErrorProc: TBIErrorProc = nil
+): TDataItem; overload;
+```
+
+Parse SQL and execute, returning the result.
+
+```pascal
+class function ProviderFrom(
+  const AData: TDataItem; 
+  const SQL: String;
+  const GetData: TGetDataProc = nil;
+  const ErrorProc: TBIErrorProc = nil
+): TDataProvider; overload;
+```
+
+Parse SQL and return the provider (TDataSelect or TSummary) without executing.
+
+### Example Usage
+
+```pascal
+var
+  Data, Result: TDataItem;
+  Provider: TDataProvider;
+begin
+  // Execute immediately
+  Result := TBISQL.From(Data, 
+    'sum(Amount) where Customer=123 group by Country');
+  
+  // Get provider for later execution
+  Provider := TBISQL.ProviderFrom(Data, 
+    'ProductName, Price where Price > 100');
+  try
+    Result := TDataItem.Create(Provider);
+  finally
+    Provider.Free;
+  end;
+end;
+```
+
+## TSQLParser Class
+
+Low-level SQL parser. See [BI.SQL.pas:27](/queries/sql-syntax#tsqlparser).
+
+```pascal
+var
+  Parser: TSQLParser;
+  Provider: TDataProvider;
+begin
+  Parser := TSQLParser.Create(Data, 'sum(Sales) group by Country');
+  try
+    Provider := Parser.Parse;
+    // Use provider...
+  finally
+    Parser.Free;
+  end;
+end;
+```
+
+## Error Handling
+
+Provide custom error handling:
+
+```pascal
+function MyErrorHandler(
+  const Sender: TObject; 
+  const Error: String
+): Boolean;
+begin
+  ShowMessage('SQL Error: ' + Error);
+  Result := True; // Don't raise exception
+end;
+
+Result := TBISQL.From(Data, 'invalid sql', nil, MyErrorHandler);
+```
+
+## Field Name Escaping
+
+Fields with spaces must be escaped with braces:
+
+```pascal
+Result := TBISQL.From(Data, '{Product Name}, {Unit Price}');
+```
+
+See [EscapedName](/queries/sql-syntax#escaping) at BI.SQL.pas:131.
+
+## Supported Keywords
+
+- `SELECT` - Select columns (optional, implied)
+- `DISTINCT` - Eliminate duplicates
+- `FROM` - Source table (optional when single source)
+- `WHERE` - Filter rows
+- `GROUP BY` - Group and aggregate
+- `ORDER BY` / `SORT BY` - Sort results
+- `HAVING` - Filter after aggregation
+- `LIMIT` - Maximum rows
+- `OFFSET` - Skip rows
+- `TOP` - Alternative to LIMIT (can be combined with OFFSET)
+
+See [IsClause](/queries/sql-syntax#keywords) at BI.SQL.pas:636.
