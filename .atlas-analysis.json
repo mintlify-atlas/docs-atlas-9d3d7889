@@ -1,0 +1,228 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "TeeBI",
+  "projectDescription": "Data-mining and visualization library for RAD Studio with in-memory database, multidimensional queries, and big-data support",
+  "theme": "sequoia",
+  "primaryColor": "#e77c38",
+  "lightColor": "#aecae4",
+  "darkColor": "#4b6d9e",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core/data-items",
+              "core/data-types",
+              "core/arrays",
+              "core/relationships"
+            ]
+          },
+          {
+            "group": "Data Import",
+            "pages": [
+              "import/overview",
+              "import/csv",
+              "import/json",
+              "import/xml",
+              "import/databases",
+              "import/excel",
+              "import/ai",
+              "import/orm"
+            ]
+          },
+          {
+            "group": "Queries & Summaries",
+            "pages": [
+              "queries/overview",
+              "queries/sql-syntax",
+              "queries/filtering",
+              "queries/sorting",
+              "queries/expressions",
+              "queries/group-by",
+              "queries/aggregations"
+            ]
+          },
+          {
+            "group": "Pivot Tables",
+            "pages": [
+              "pivot/overview",
+              "pivot/dimensions",
+              "pivot/measures",
+              "pivot/editor"
+            ]
+          },
+          {
+            "group": "Visualization",
+            "pages": [
+              "visualization/overview",
+              "visualization/charts",
+              "visualization/grids",
+              "visualization/trees",
+              "visualization/geographic"
+            ]
+          },
+          {
+            "group": "Data Export",
+            "pages": [
+              "export/overview",
+              "export/formats",
+              "export/customization"
+            ]
+          },
+          {
+            "group": "Advanced Topics",
+            "pages": [
+              "advanced/performance",
+              "advanced/big-data",
+              "advanced/parallel-processing",
+              "advanced/web-server",
+              "advanced/compression"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core Classes",
+            "pages": [
+              "api/tdataitem",
+              "api/tdatakind",
+              "api/tmissingdata",
+              "api/tarrays"
+            ]
+          },
+          {
+            "group": "Query Engine",
+            "pages": [
+              "api/tbisql",
+              "api/tbiquery",
+              "api/tsummary",
+              "api/tdataselect",
+              "api/texpression"
+            ]
+          },
+          {
+            "group": "Import Classes",
+            "pages": [
+              "api/tbicsv",
+              "api/tbijson",
+              "api/tbidb",
+              "api/tbixml",
+              "api/tbiai",
+              "api/tbirtti"
+            ]
+          },
+          {
+            "group": "Export Classes",
+            "pages": [
+              "api/export-classes"
+            ]
+          },
+          {
+            "group": "Visual Components",
+            "pages": [
+              "api/tbigrid",
+              "api/tbichart",
+              "api/tbitree"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "api/tbicompare",
+              "api/tbiconvert",
+              "api/tbimerge",
+              "api/tbisearch"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "examples/basic-usage",
+              "examples/importing-data",
+              "examples/simple-queries"
+            ]
+          },
+          {
+            "group": "Query Examples",
+            "pages": [
+              "examples/sql-queries",
+              "examples/group-by",
+              "examples/filters",
+              "examples/expressions"
+            ]
+          },
+          {
+            "group": "Visualization Examples",
+            "pages": [
+              "examples/charts",
+              "examples/grids",
+              "examples/pivot-tables",
+              "examples/geographic-maps"
+            ]
+          },
+          {
+            "group": "Advanced Examples",
+            "pages": [
+              "examples/master-detail",
+              "examples/big-data",
+              "examples/parallel-processing",
+              "examples/web-server"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Ultra-fast in-memory database with array-based columns",
+    "Big-data support for billions of cells",
+    "Multi-platform (VCL, FireMonkey, Lazarus)",
+    "SQL-like query engine with summaries and group-by",
+    "Excel-like pivot tables with drag & drop editor",
+    "Import from CSV, JSON, XML, databases, Excel, AI agents",
+    "Export to multiple formats (CSV, PDF, HTML, XML, Excel, JSON)",
+    "Automatic visualizations (charts, grids, trees)",
+    "Geographic database with world maps and statistics",
+    "Master-detail relationships and automatic indexing"
+  ],
+  "publicApiSurface": [
+    "TDataItem - Core data structure class",
+    "TDataKind - Data type enumeration",
+    "TBISQL - SQL query parser and executor",
+    "TBIQuery - Component for queries and summaries",
+    "TSummary - Aggregation and group-by operations",
+    "TBICSV - CSV import/export",
+    "TBIJson - JSON import/export",
+    "TBIDB - Database import",
+    "TBIXML - XML import/export",
+    "TBIAI - AI agent import",
+    "TBIGrid - Grid visualization component",
+    "TBIChart - Chart visualization component",
+    "TExpression - Expression engine",
+    "TAggregate - Aggregation functions",
+    "TDataSelect - Select query operations",
+    "TBICompare - Data comparison utilities",
+    "TBIConvert - Data conversion utilities",
+    "TBIMerge - Data merging operations",
+    "TBISearch - Search functionality"
+  ]
+}
